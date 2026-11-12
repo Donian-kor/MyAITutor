@@ -38,7 +38,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         // 다운로드 상태를 주기적으로 갱신합니다. (C-01)
         viewModelScope.launch {
             while (isActive) {
-                val snapshot = withContext(Dispatchers.IO) { modelManager.snapshot() }
+                val snapshot = withContext(Dispatchers.IO) {
+                    if (modelManager.needsHashVerification()) {
+                        modelManager.verifyModelHash()
+                    }
+                    modelManager.snapshot()
+                }
                 _state.value = _state.value.copy(modelSnapshot = snapshot)
                 val busy = snapshot.status == ModelDownloadStatus.DOWNLOADING ||
                     snapshot.status == ModelDownloadStatus.QUEUED ||

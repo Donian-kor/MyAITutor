@@ -7,6 +7,7 @@ import android.os.Environment
 import android.os.StatFs
 import java.io.IOException
 import java.io.File
+import kotlinx.coroutines.withContext
 
 /**
  * Gemma 4 E4B-IT LiteRT-LM model downloader.
@@ -30,6 +31,9 @@ class ModelDownloadManager(context: Context) {
         val completedPreviously = preferences.getBoolean(KEY_COMPLETED, false)
 
         if (completedPreviously && modelFile.isFile && modelFile.length() >= MIN_MODEL_BYTES) {
+            if (EXPECTED_MODEL_SHA256.isNotEmpty() && preferences.getBoolean(KEY_HASH_MISMATCH, false)) {
+                return failedSnapshot("모델 파일 무결성 검증에 실패했습니다. 모델을 다시 다운로드해 주세요.")
+            }
             return ModelDownloadSnapshot(
                 status = ModelDownloadStatus.READY,
                 downloadedBytes = modelFile.length(),
@@ -72,6 +76,9 @@ class ModelDownloadManager(context: Context) {
                 )
                 DownloadManager.STATUS_SUCCESSFUL -> {
                     if (modelFile.isFile && modelFile.length() >= MIN_MODEL_BYTES) {
+                        if (EXPECTED_MODEL_SHA256.isNotEmpty() && preferences.getBoolean(KEY_HASH_MISMATCH, false)) {
+                            return failedSnapshot("모델 파일 무결성 검증에 실패했습니다. 모델을 다시 다운로드해 주세요.")
+                        }
                         preferences.edit().putBoolean(KEY_COMPLETED, true).apply()
                         ModelDownloadSnapshot(
                             ModelDownloadStatus.READY,
@@ -132,10 +139,51 @@ class ModelDownloadManager(context: Context) {
         preferences.edit()
             .remove(KEY_DOWNLOAD_ID)
             .putBoolean(KEY_COMPLETED, false)
+            .putBoolean(KEY_HASH_VERIFIED, false)
+            .putBoolean(KEY_HASH_MISMATCH, false)
             .apply()
     }
 
     fun isModelReady(): Boolean = snapshot().status == ModelDownloadStatus.READY
+
+    /**
+     * 해시 검증이 필요한지 여부. EXPECTED_MODEL_SHA256이 비어 있으면 검증을 건너뜁니다.
+     */
+    fun needsHashVerification(): Boolean {
+        if (EXPECTED_MODEL_SHA256.isEmpty()) return false
+        if (!modelFile.isFile || modelFile.length() < MIN_MODEL_BYTES) return false
+        if (preferences.getBoolean(KEY_HASH_VERIFIED, false)) return false
+        if (preferences.getBoolean(KEY_HASH_MISMATCH, false)) return false
+        return true
+    }
+
+    /**
+     * 모델 파일의 SHA-256을 계산해 기대값과 비교합니다.
+     * IO 스레드에서 호출해야 합니다. 결과는 SharedPreferences에 캐시됩니다.
+     */
+    suspend fun verifyModelHash(): Boolean = withContext(kotlinx.coroutines.Dispatchers.IO) {
+        if (EXPECTED_MODEL_SHA256.isEmpty()) return@withContext true
+        if (!modelFile.isFile) return@withContext false
+        try {
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            modelFile.inputStream().use { input ->
+                val buffer = ByteArray(1024 * 1024)
+                var read: Int
+                while (input.read(buffer).also { read = it } != -1) {
+                    digest.update(buffer, 0, read)
+                }
+            }
+            val actual = digest.digest().joinToString("") { "%02x".format(it) }
+            val match = actual.equals(EXPECTED_MODEL_SHA256, ignoreCase = true)
+            preferences.edit()
+                .putBoolean(KEY_HASH_VERIFIED, match)
+                .putBoolean(KEY_HASH_MISMATCH, !match)
+                .apply()
+            match
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     private fun failedSnapshot(message: String) = ModelDownloadSnapshot(
         status = ModelDownloadStatus.FAILED,
@@ -148,11 +196,15 @@ class ModelDownloadManager(context: Context) {
         const val MODEL_DOWNLOAD_URL =
             "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm?download=true"
         const val MODEL_FILE_NAME = "gemma-4-E4B-it.litertlm"
-        const val EXPECTED_MODEL_BYTES = 3_654_000_000L
+        const val EXPECTED_MODEL_BYTES = 3_659_530_240L
+        // 모델 파일의 SHA-256 (소문자 hex). 비어 있으면 해시 검증을 건너뜁니다.
+        const val EXPECTED_MODEL_SHA256 = ""
         private const val MIN_MODEL_BYTES = 3_500_000_000L
         private const val PREFS_NAME = "focus_ai_model_manager"
         private const val KEY_DOWNLOAD_ID = "download_id"
         private const val KEY_COMPLETED = "model_completed"
+        private const val KEY_HASH_VERIFIED = "model_hash_verified"
+        private const val KEY_HASH_MISMATCH = "model_hash_mismatch"
     }
 }
 
