@@ -1,34 +1,86 @@
-# MyAITutor 0.0.1 — 생성 및 검증 보고서
+# 나만의 AI쌤 (MyAITutor) 0.0.1 — 빌드 및 검증 보고서
 
-## 생성된 항목
+> 갱신일: 2026-11-12. STEP 0~8 진행 결과 반영.
 
-- Android Gradle 프로젝트 구조
-- Kotlin + Jetpack Compose 메인 UI
-- CameraX 사각형 미리보기 및 정지 촬영
-- 하단 과목 선택 UI
-- 설정 화면
-- Android DownloadManager 기반 Wi-Fi 전용 모델 다운로드
-- LiteRT-LM 0.18.0 Engine / Conversation 연결
-- Gemma 4 E4B 이미지 입력 및 한국어 선생님 프롬프트
-- GPU 우선, CPU 대체 초기화 로직
-- 임시 촬영 파일 삭제
+## 프로젝트 구조 (17개 Kotlin 파일)
 
-## 확인한 사항
+```
+com.donian.myaitutor/
+├─ MainActivity.kt
+├─ ai/
+│  ├─ GemmaAssistant.kt            # 엔진/대화/스트리밍/중단/세션 리셋
+│  ├─ Assistant.kt                 # 추상 인터페이스 (테스트 주입용)
+│  └─ PromptTemplates.kt           # 시스템 지시문·프롬프트 상수
+├─ camera/
+│  ├─ CameraPreview.kt             # CameraX 프리뷰
+│  ├─ CameraScreen.kt              # 카메라 화면 (UI)
+│  └─ ImageNormalizer.kt           # EXIF 회전 + 다운스케일
+├─ model/
+│  ├─ ModelDownloadManager.kt      # 다운로드/상태/무결성 검증
+│  ├─ ModelDownloadRepository.kt   # 추상 인터페이스
+│  └─ ModelDownloadState.kt        # enum + snapshot
+└─ ui/
+   ├─ FocusAiApp.kt                # 화면 전환 + 상태 위임 (296줄)
+   ├─ home/
+   │  ├─ HomeScreen.kt             # 홈 레이아웃
+   │  ├─ HomeViewModel.kt          # 상태/생성/취소/폴링
+   │  ├─ HomeUiState.kt            # UI 상태 데이터
+   │  └─ HomeContent.kt            # 과목·후속 선택 상수
+   ├─ camera/CameraScreen.kt
+   ├─ settings/SettingsScreen.kt
+   ├─ components/InfoCard.kt
+   ├─ theme/Theme.kt
+   └─ text/
+      ├─ AnswerSegments.kt         # LaTeX 분리 (순수)
+      ├─ AnswerMarkdown.kt         # Markdown → AnnotatedString
+      └─ AssistantAnswer.kt        # 답변 렌더링
+```
 
-- XML 리소스 및 AndroidManifest XML 파싱: 통과
-- Kotlin 소스 구문 수준 검사: 파서 오류 메시지 없음
-- 버전 설정: versionCode 1 / versionName 0.0.1
-- 모델 파일은 APK에 포함하지 않음
+## 빌드 검증
 
-## 아직 실행하지 못한 검증
+| 항목 | 결과 |
+|---|---|
+| `.\gradlew.bat :app:assembleDebug` | BUILD SUCCESSFUL |
+| `.\gradlew.bat :app:testDebugUnitTest` | BUILD SUCCESSFUL (17 tests) |
+| `.\gradlew.bat :app:lintDebug` | BUILD SUCCESSFUL, 0 error / 26 warning / 1 hint |
+| APK ABI | arm64-v8a, x86_64 (32비트 제외) |
+| APK 크기 | 70.7MB |
 
-이 생성 환경에는 Android SDK, Android Gradle Plugin 캐시 및 Gradle 배포 파일이 준비되어 있지 않고 외부 Gradle 배포 서버에 직접 접근할 수 없어 `assembleDebug`를 실행하지 못했습니다. 따라서 아래 항목은 사용자 PC의 Android Studio에서 확인해야 합니다.
+## 테스트 (17개)
 
-1. Gradle Sync 및 의존성 다운로드
-2. `assembleDebug` APK 빌드
-3. 실제 Android 기기 카메라 권한 및 CameraX 프리뷰
-4. Gemma 4 E4B 모델 다운로드 완료
-5. LiteRT-LM GPU/CPU 초기화 및 멀티모달 이미지 추론
-6. 한국어·영어·수학 수식·표·그래프 문제별 답변 품질
+| 파일 | 케이스 |
+|---|---|
+| `AnswerSegmentsTest` | 수식/텍스트 분리 5 |
+| `AnswerMarkdownTest` | 굵게/제목/목록 4 |
+| `ModelDownloadSnapshotTest` | progress/formatBytes 4 |
+| `HomeViewModelTest` | 생성/중단/중복 4 |
 
-이 프로젝트는 초기 구현 소스이며, 실제 APK 빌드와 기기 테스트를 통과했다고 주장하지 않습니다.
+## 실기기 검증 (P-01~P-09)
+
+| 항목 | 결과 |
+|---|---|
+| P-01 답변 중단 | ✅ |
+| P-02 입력창 상시 노출 | ✅ |
+| P-03 마크다운 렌더링 | ✅ |
+| P-04 촬영 버튼 색 | ✅ |
+| P-05 후속 선택 칩 | ✅ |
+| P-06 모델 다운로드/삭제 | ✅ |
+| P-07 LaTeX 렌더링 | ✅ |
+| P-08 카메라 흐름 | ✅ |
+| P-09 권한 거부 | ✅ |
+| C-02 임시 파일 정리 | ✅ (cacheDir 잔여 없음) |
+
+## 모델
+
+- Gemma 4 E4B-IT LiteRT-LM, 약 3.66GB
+- Hugging Face `litert-community/gemma-4-E4B-it-litert-lm`
+- Wi-Fi 전용 다운로드, 저장 공간 사전 확인
+- LiteRT-LM GPU 우선 / CPU 대체 초기화
+- SHA-256 무결성 검증 인프라 포함 (해시값 입력 시 활성화)
+
+## 알려진 제한
+
+- LiteRT-LM의 이미지 입력 및 GPU/CPU 백엔드는 실제 대상 기기에서 검증 필요
+- 모델 답변의 수학적 정확도·모든 과목 인식률 보장하지 않음
+- 대화 문맥은 앱 프로세스 메모리에만 유지 (재실행 시 복원 없음)
+- C-03 SHA-256 해시값은 실제 파일 값 입력 전까지 비활성

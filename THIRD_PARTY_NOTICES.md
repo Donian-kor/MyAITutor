@@ -10,5 +10,7 @@
 | Jetpack Compose | Android UI | AndroidX 라이선스 | https://developer.android.com/compose |
 | Compose LaTeX Renderer | AI 답변의 LaTeX 수식 렌더링 | MIT | https://github.com/huarangmeng/latex |
 | Kotlin Coroutines | 비동기 처리 | Apache 2.0 | https://github.com/Kotlin/kotlinx.coroutines |
+| AndroidX ExifInterface | 촬영 이미지 EXIF 방향 보정 | AndroidX 라이선스 | https://developer.android.com/jetpack/androidx/releases/exifinterface |
+| JUnit 4 / kotlinx-coroutines-test | 단위 테스트 (APK 미포함) | JUnit: Eclipse Public License 1.0 / Coroutines: Apache 2.0 | https://junit.org |
 
 모델 파일은 앱에 포함하지 않고 사용자가 앱 내에서 Hugging Face 원본 저장소로부터 다운로드합니다. 앱 출시 전에 Gemma 모델 관련 최신 이용 조건, LiteRT-LM AAR의 라이선스, 모든 전이 의존성의 고지 의무를 최종 점검하십시오.
