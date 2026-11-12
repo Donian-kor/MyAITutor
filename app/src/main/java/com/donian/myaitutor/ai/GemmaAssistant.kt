@@ -29,36 +29,49 @@ class GemmaAssistant(context: Context) {
 
     private var engine: Engine? = null
     private var conversation: Conversation? = null
-    private var selectedBackendLabel: String = "미실??
+    private var selectedBackendLabel: String = "미실행"
+
+    suspend fun preWarm() {
+        withContext(runtimeDispatcher) {
+            runCatching { ensureInitializedOnRuntimeThread() }
+        }
+    }
 
     suspend fun analyzeImage(
         imageFile: File,
         subject: String,
         onTextChanged: suspend (String) -> Unit
     ) = withContext(runtimeDispatcher) {
-        require(imageFile.exists() && imageFile.length() > 0L) { "촬영 ?��?지가 ?�습?�다." }
+        require(imageFile.exists() && imageFile.length() > 0L) { "촬영된 이미지가 없습니다." }
         ensureInitializedOnRuntimeThread()
 
         val prompt = """
-            [???�습 문제]
-            ?�택 과목: $subject
+            [풀어야 할 문제]
+            선택 과목: $subject
 
-            카메???��?지???�는 문제�?직접 ?�고 분석??주세??
-            OCR ?�스?�만 가?�하지 말고 ?��?지??문장, ?�식, ?? 그래?? ?�형???�께 ?�인?�세??
+            카메라로 촬영한 이미지의 문제를 직접 읽고 분석해 주세요.
+            OCR 텍스트만 가정하지 말고, 이미지 속 문장, 식, 표, 그래프, 형식을 모두 확인하세요.
+            수식은 실제 수학식으로 표시될 수 있도록 표준 LaTeX 문법으로 작성하세요.
+            문장 안의 짧은 수식은 ${'$'}...${'$'}, 독립된 수식은 ${'$'}${'$'}...${'$'}${'$'}로 감싸세요.
+            분수는 \\frac{a}{b}, 제곱근은 \\sqrt{x}, 지수와 아래첨자는 x^{2}, a_{n}처럼 작성하세요.
+            수학 기호를 ASCII 문자로 풀어 쓰거나 코드 블록에 넣지 말고, 수식 외의 설명은 한국어로 작성하세요.
+            풀이 문장은 한국어로 유지하고, 계산식은 한 줄에 하나씩 적으세요.
 
-            ?�제 ?�생?�처???�연?�러???�국??존댓말로 ?�명?�세??
-            ?�음 ?�서�??��??�세??
-            1. 문제?�서 묻는 ?�용 ?�리
-            2. ?�요??기초 개념 ?�명
-            3. ?�심 ?�리?� 공식 ?�명
-            4. 문제??개념 ?�용
-            5. ?�계�??�세 ?�??            6. 최종 ?�답
-            7. 검???�는 근거 ?�인
-            8. 마�?막에 ?�해�??�는 짧�? ?�인 질문
+            문제 해결 과정은 단계별로 구어체 존댓말로 설명하세요.
+            다음 순서로 작성해 주세요.
+            1. 문제에서 묻는 내용을 정리
+            2. 필요한 기초 개념 설명
+            3. 핵심 원리나 공식 설명
+            4. 문제에 개념 적용
+            5. 계산 과정은 세세하게 단계별로
+            6. 최종 답안
+            7. 검산하는 근거 제시
+            8. 마지막에 이해를 돕는 짧은 확인 질문
 
-            ?��?지가 ?�리거나 문제 ?��?가 ?�렸거나 ?�식·?�형???�독?????�다�?추측?��? 말고,
-            ?�떤 부분을 ?�시 촬영?�야 ?�는지 구체?�으�??�려주세??
-            ?�러 문제가 보이�?가??중앙???�는 문제 ?�나�??�선 분석?�고, 문제가 ?�러 개라�?            ?�용?��? ?�택?�도�??�내?�세??
+            이미지가 흐리거나 문제 텍스트가 잘렸거나 식·형식을 읽기 어렵다면 추측으로 말고,
+            어떤 부분을 다시 촬영해야 하는지 구체적으로 알려주세요.
+            여러 문제가 보이면, 중앙에 있는 문제 하나만 선 분석하고, 문제가 여러 개라면
+            내용 중 어떤 선택지도 빼지 말고 안내해 주세요.
         """.trimIndent()
 
         streamResponse(
@@ -75,7 +88,7 @@ class GemmaAssistant(context: Context) {
         question: String,
         onTextChanged: suspend (String) -> Unit
     ) = withContext(runtimeDispatcher) {
-        require(question.isNotBlank()) { "질문???�력??주세??" }
+        require(question.isNotBlank()) { "질문 내용을 입력해 주세요." }
         ensureInitializedOnRuntimeThread()
         streamResponse(
             conversation = requireNotNull(conversation),
@@ -91,17 +104,20 @@ class GemmaAssistant(context: Context) {
 
         val modelFile = ModelDownloadManager(appContext).modelFile
         require(modelFile.isFile && modelFile.length() >= 3_500_000_000L) {
-            "Gemma 4 E4B 모델???�치?��? ?�았?�니?? ?�정?�서 모델???�운로드??주세??"
+            "Gemma 4 E4B 모델이 설치되지 않았습니다. 설정에서 모델을 다운로드해 주세요."
         }
 
         val systemInstruction = """
-            ?�신?� MyAITutor????과목 ?�문 ?�습 ?�생?�입?�다.
-            목표???�생???�답???�우??것이 ?�니??개념???�해?�도�??�는 것입?�다.
-            ?�제??친절?�고 차분???�국??존댓말을 ?�용?�세??
-            문제�?받으�?개념�??�리�?먼�? ?�명?�고, 그다??문제 ?�용�??�계�??�?��? ?�시?�세??
-            근거가 부족하거나 ?��?지가 불명?�하�??�답??꾸며?��? 말고 ?�인???�청?�세??
-            ?�생???�속 질문???�면 ?�재 ?�?�의 문제?� ?�선 ?�명??기억???�어???�하?�요.
-            ?�학 ?�현?� ?�기 ?�운 ?�식 ?�기�??�성?�고, ?�요??경우 LaTeX ?�기�??�용?�세??
+            당신은 MyAITutor의 과목별 문제 학습 도우미입니다.
+            목표는 학생이 답만 얻는 것이 아니라, 개념을 이해하고 스스로 풀 수 있도록 하는 것입니다.
+            문제마다 친절하고 차분한 한국어 존댓말을 사용하세요.
+            문제를 받으면 개념을 먼저 정리하고, 그다음 문제 적용을 단계별로 상세히 설명하세요.
+            근거가 부족하거나 촬영 이미지가 불명확하면 답을 꾸며내지 말고 사용자에게 재촬영을 청하세요.
+            학생이 추가 질문을 하면, 현재 문제의 맥락을 먼저 설명하고 기억해서 계속 도와주세요.
+            모든 수학식은 표준 LaTeX 문법으로 작성하세요. 문장 안 수식은 ${'$'}...${'$'}, 독립된 수식은 ${'$'}${'$'}...${'$'}${'$'}로 감싸세요.
+            분수는 \\frac{a}{b}, 제곱근은 \\sqrt{x}, 위·아래첨자는 x^{2}, a_{n}처럼 표현하세요.
+            수식을 ASCII 문자로 풀어 쓰거나 코드 블록에 넣지 말고, 풀이 설명은 한국어로 작성하세요.
+            계산식은 한 줄에 하나씩 쓰고, 수식 주위에 코드 블록을 사용하지 마세요.
         """.trimIndent()
 
         val configs = listOf(
@@ -150,7 +166,7 @@ class GemmaAssistant(context: Context) {
         }
 
         throw IllegalStateException(
-            "Gemma 4 E4B�?GPU?� CPU?�서 모두 초기?�하지 못했?�니?? 기기 메모리�? 모델 ?�일???�인??주세??",
+            "Gemma 4 E4B가 GPU와 CPU에서 모두 초기화하지 못했습니다. 기기 메모리와 모델 파일을 확인해 주세요.",
             lastError
         )
     }
@@ -174,6 +190,6 @@ class GemmaAssistant(context: Context) {
         conversation = null
         runCatching { engine?.close() }
         engine = null
-        selectedBackendLabel = "미실??
+        selectedBackendLabel = "미실행"
     }
 }

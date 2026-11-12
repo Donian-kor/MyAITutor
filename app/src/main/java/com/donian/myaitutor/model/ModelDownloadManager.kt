@@ -34,7 +34,7 @@ class ModelDownloadManager(context: Context) {
                 status = ModelDownloadStatus.READY,
                 downloadedBytes = modelFile.length(),
                 totalBytes = EXPECTED_MODEL_BYTES,
-                message = "AI 모델 ?�치 ?�료"
+                message = "AI 모델 설치 완료"
             )
         }
 
@@ -43,15 +43,15 @@ class ModelDownloadManager(context: Context) {
                 status = ModelDownloadStatus.NOT_INSTALLED,
                 downloadedBytes = 0L,
                 totalBytes = EXPECTED_MODEL_BYTES,
-                message = "Gemma 4 E4B 모델???�치?��? ?�았?�니??"
+                message = "Gemma 4 E4B 모델이 설치되지 않았습니다."
             )
         }
 
         val cursor = downloadManager.query(DownloadManager.Query().setFilterById(downloadId))
-            ?: return failedSnapshot("?�운로드 ?�태�??�인?????�습?�다.")
+            ?: return failedSnapshot("다운로드 상태를 확인할 수 없습니다.")
 
         cursor.use {
-            if (!it.moveToFirst()) return failedSnapshot("?�운로드 ??��??찾을 ???�습?�다.")
+            if (!it.moveToFirst()) return failedSnapshot("다운로드 기록을 찾을 수 없습니다.")
 
             val status = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
             val downloaded = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
@@ -60,15 +60,15 @@ class ModelDownloadManager(context: Context) {
             return when (status) {
                 DownloadManager.STATUS_PENDING -> ModelDownloadSnapshot(
                     ModelDownloadStatus.QUEUED, downloaded, total,
-                    "?�운로드 ?��?�?· Wi-Fi ?�결???�인??주세??"
+                    "다운로드 대기 중 · Wi-Fi 연결을 확인해 주세요."
                 )
                 DownloadManager.STATUS_RUNNING -> ModelDownloadSnapshot(
                     ModelDownloadStatus.DOWNLOADING, downloaded, total,
-                    "Gemma 4 E4B 모델 ?�운로드 �?
+                    "Gemma 4 E4B 모델 다운로드 중"
                 )
                 DownloadManager.STATUS_PAUSED -> ModelDownloadSnapshot(
                     ModelDownloadStatus.PAUSED, downloaded, total,
-                    "?�운로드 ?�시 중�? · Wi-Fi ?�결???�인??주세??"
+                    "다운로드 일시 중지 · Wi-Fi 연결을 확인해 주세요."
                 )
                 DownloadManager.STATUS_SUCCESSFUL -> {
                     if (modelFile.isFile && modelFile.length() >= MIN_MODEL_BYTES) {
@@ -77,17 +77,17 @@ class ModelDownloadManager(context: Context) {
                             ModelDownloadStatus.READY,
                             modelFile.length(),
                             if (total > 0L) total else EXPECTED_MODEL_BYTES,
-                            "AI 모델 ?�치 ?�료"
+                            "AI 모델 설치 완료"
                         )
                     } else {
-                        failedSnapshot("?�운로드 ?�일 ?�기가 ?�상보다 ?�습?�다. 모델???�시 ?�운로드??주세??")
+                        failedSnapshot("다운로드 파일 크기가 예상보다 작습니다. 모델을 다시 다운로드해 주세요.")
                     }
                 }
                 DownloadManager.STATUS_FAILED -> {
                     val reason = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
-                    failedSnapshot("?�운로드 ?�패 (?�류 코드: $reason). ?�시 ?�도??주세??")
+                    failedSnapshot("다운로드 실패 (오류 코드: $reason). 다시 시도해 주세요.")
                 }
-                else -> failedSnapshot("?????�는 ?�운로드 ?�태?�니??")
+                else -> failedSnapshot("알 수 없는 다운로드 상태입니다.")
             }
         }
     }
@@ -97,7 +97,7 @@ class ModelDownloadManager(context: Context) {
         val availableBytes = StatFs(storageDirectory.absolutePath).availableBytes
         val requiredBytes = EXPECTED_MODEL_BYTES + 600_000_000L
         if (availableBytes < requiredBytes) {
-            throw IOException("?�??공간??부족합?�다. ??4.3GB ?�상???�유 공간???�보??주세??")
+            throw IOException("저장 공간이 부족합니다. 약 4.3GB 이상의 여유 공간을 확보해 주세요.")
         }
 
         val existingId = preferences.getLong(KEY_DOWNLOAD_ID, -1L)
@@ -108,8 +108,8 @@ class ModelDownloadManager(context: Context) {
         preferences.edit().putBoolean(KEY_COMPLETED, false).apply()
 
         val request = DownloadManager.Request(Uri.parse(MODEL_DOWNLOAD_URL))
-            .setTitle("MyAITutor 모델 ?�운로드")
-            .setDescription("Gemma 4 E4B-IT · ??3.66GB · Wi-Fi ?�용")
+            .setTitle("MyAITutor 모델 다운로드")
+            .setDescription("Gemma 4 E4B-IT · 약 3.66GB · Wi-Fi 전용")
             .setMimeType("application/octet-stream")
             .setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI)
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
@@ -178,7 +178,7 @@ data class ModelDownloadSnapshot(
         get() = formatBytes(downloadedBytes)
 
     val totalLabel: String
-        get() = if (totalBytes > 0L) formatBytes(totalBytes) else "?�인 �?
+        get() = if (totalBytes > 0L) formatBytes(totalBytes) else "알 수 없음"
 
     private fun formatBytes(bytes: Long): String {
         if (bytes <= 0L) return "0 MB"

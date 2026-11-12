@@ -1,6 +1,12 @@
 package com.donian.myaitutor.camera
 
 import android.content.Context
+import android.annotation.SuppressLint
+import android.hardware.display.DisplayManager
+import android.os.Handler
+import android.os.Looper
+import android.view.Display
+import android.view.Surface
 import android.view.ViewGroup
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
@@ -26,6 +32,7 @@ import java.io.File
 typealias CaptureImageAction = (File, (Result<File>) -> Unit) -> Unit
 
 @Composable
+@SuppressLint("WrongConstant")
 fun CameraPreview(
     modifier: Modifier = Modifier,
     onCaptureReady: (CaptureImageAction?) -> Unit,
@@ -48,8 +55,35 @@ fun CameraPreview(
 
     DisposableEffect(context, lifecycleOwner, previewView) {
         val providerFuture = ProcessCameraProvider.getInstance(context)
+        val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        val mainHandler = Handler(Looper.getMainLooper())
         var cameraProvider: ProcessCameraProvider? = null
         var disposed = false
+
+        fun currentRotation(): Int {
+            val rotation = previewView.display?.rotation
+                ?: displayManager.getDisplay(Display.DEFAULT_DISPLAY)?.rotation
+                ?: Surface.ROTATION_0
+            return when (rotation) {
+                Surface.ROTATION_90 -> Surface.ROTATION_90
+                Surface.ROTATION_180 -> Surface.ROTATION_180
+                Surface.ROTATION_270 -> Surface.ROTATION_270
+                else -> Surface.ROTATION_0
+            }
+        }
+
+        val displayListener = object : DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) = Unit
+
+            override fun onDisplayRemoved(displayId: Int) = Unit
+
+            override fun onDisplayChanged(displayId: Int) {
+                if (displayId == Display.DEFAULT_DISPLAY) {
+                    imageCapture?.targetRotation = currentRotation()
+                }
+            }
+        }
+        displayManager.registerDisplayListener(displayListener, mainHandler)
 
         val listener = Runnable {
             try {
@@ -63,6 +97,7 @@ fun CameraPreview(
                 val capture = ImageCapture.Builder()
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                     .setJpegQuality(95)
+                    .setTargetRotation(currentRotation())
                     .build()
 
                 provider.unbindAll()
@@ -74,7 +109,7 @@ fun CameraPreview(
                 )
                 imageCapture = capture
             } catch (error: Exception) {
-                onCameraError(error.localizedMessage ?: "카메?��? ?�작?��? 못했?�니??")
+                onCameraError(error.localizedMessage ?: "카메라를 시작하지 못했습니다.")
             }
         }
 
@@ -82,6 +117,7 @@ fun CameraPreview(
 
         onDispose {
             disposed = true
+            displayManager.unregisterDisplayListener(displayListener)
             imageCapture = null
             onCaptureReady(null)
             runCatching { cameraProvider?.unbindAll() }
