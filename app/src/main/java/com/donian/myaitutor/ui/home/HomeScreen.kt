@@ -94,6 +94,8 @@ internal fun HomeScreen(
     isAnalyzing: Boolean,
     statusMessage: String?,
     onDismissStatus: () -> Unit,
+    onRetryAnalysis: () -> Unit,
+    canRetryAnalysis: Boolean,
     onSend: () -> Unit,
     onSendChoice: (String) -> Unit,
     showFollowUpChoices: Boolean,
@@ -408,6 +410,9 @@ internal fun HomeScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color(0xFF8A3C16)
                             )
+                            if (canRetryAnalysis) {
+                                TextButton(onClick = onRetryAnalysis) { Text("다시 시도") }
+                            }
                             TextButton(onClick = onDismissStatus) { Text("닫기") }
                         }
                     }

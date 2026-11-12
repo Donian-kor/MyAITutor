@@ -286,6 +286,10 @@ fun FocusAiApp() {
             isAnalyzing = uiState.isAnalyzing,
             statusMessage = uiState.statusMessage,
             onDismissStatus = { viewModel.dismissStatus() },
+            onRetryAnalysis = {
+                uiState.capturedImage?.let { viewModel.analyzeImage(it, selectedSubject) }
+            },
+            canRetryAnalysis = uiState.capturedImage != null && !uiState.isAnalyzing,
             onSend = { viewModel.sendQuestion(uiState.inputText); focusManager.clearFocus() },
             onSendChoice = { prompt -> viewModel.sendQuestion(prompt, showChoicesAfterResponse = true) },
             showFollowUpChoices = uiState.showFollowUpChoices,
