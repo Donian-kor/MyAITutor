@@ -6,7 +6,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,7 +17,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.core.content.ContextCompat
 import com.donian.myaitutor.camera.CaptureImageAction
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.donian.myaitutor.model.ModelDownloadStatus
 import com.donian.myaitutor.ui.camera.CameraScreen
@@ -29,29 +27,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-
-
-
-
-
-
-/** 촬영 임시 파일 이름 접두사. cacheDir 정리 대상 식별에 사용합니다. */
-private const val CaptureFilePrefix = "focus_capture_"
-
-/** 아직 남아 있는 촬영 임시 파일 중 1시간이 지난 것만 지웁니다. 사용 중인 파일은 건드리지 않습니다. */
-private fun File.deleteStaleCaptures(now: Long = System.currentTimeMillis()) {
-    runCatching {
-        listFiles { file -> file.name.startsWith(CaptureFilePrefix) }?.forEach { file ->
-            if (now - file.lastModified() > 60L * 60L * 1000L) file.delete()
-        }
-    }
-}
-
-/** 촬영 임시 파일을 지웁니다. 이미 없거나 삭제에 실패해도 예외를 던지지 않습니다. */
-private fun File.deleteQuietly() {
-    runCatching { if (exists()) delete() }
-}
-
+import com.donian.myaitutor.ui.home.deleteQuietly
+import com.donian.myaitutor.ui.home.deleteStaleCaptures
 
 @Composable
 fun FocusAiApp() {
@@ -64,9 +41,6 @@ fun FocusAiApp() {
         )
     }
     val uiState by viewModel.state.collectAsState()
-    DisposableEffect(viewModel) {
-        onDispose { /* scope is managed by composition */ }
-    }
 
     var showSettings by remember { mutableStateOf(false) }
     var showCamera by remember { mutableStateOf(false) }
