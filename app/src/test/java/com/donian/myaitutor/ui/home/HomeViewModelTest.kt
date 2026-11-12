@@ -38,6 +38,7 @@ class HomeViewModelTest {
             onTextChanged("후속 답변")
         }
         override suspend fun backendLabel(): String = "TEST"
+        override suspend fun getTokenCount(): Int = 0
         override fun cancelGeneration() { cancelCalls++ }
         override suspend fun preWarm() {}
         override suspend fun release() {}
@@ -70,6 +71,8 @@ class HomeViewModelTest {
         assertEquals(false, vm.state.value.isAnalyzing)
         assertEquals("분석 결과", vm.state.value.answer)
         assertEquals("인식된 문제", assistant.receivedOcrText)
+        assertEquals("인식된 문제", vm.state.value.ocrText)
+        assertEquals(null, vm.state.value.analysisStage)
         file.delete()
     }
 

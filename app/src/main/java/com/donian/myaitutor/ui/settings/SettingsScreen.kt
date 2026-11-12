@@ -60,11 +60,16 @@ import com.donian.myaitutor.ui.components.InfoCard
 internal fun SettingsScreen(
     snapshot: ModelDownloadSnapshot,
     backendLabel: String,
+    tokenCount: Int,
+    maxContextTokens: Int,
+    maxOutputTokens: Int,
     onBack: () -> Unit,
     onDownload: () -> Unit,
-    onDeleteModel: () -> Unit
+    onDeleteModel: () -> Unit,
+    onClearCache: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showLicensesDialog by remember { mutableStateOf(false) }
     val isBusy = snapshot.status == ModelDownloadStatus.DOWNLOADING ||
         snapshot.status == ModelDownloadStatus.QUEUED || snapshot.status == ModelDownloadStatus.PAUSED
 
@@ -164,6 +169,22 @@ internal fun SettingsScreen(
                 }
             }
 
+            OutlinedButton(
+                onClick = onClearCache,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text(stringResource(R.string.settings_btn_clear_cache))
+            }
+
+            OutlinedButton(
+                onClick = { showLicensesDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text(stringResource(R.string.settings_btn_licenses))
+            }
+
             InfoCard(
                 icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 title = stringResource(R.string.settings_ocr_title),
@@ -187,6 +208,7 @@ internal fun SettingsScreen(
             Text("나만의 AI쌤 0.0.1 · Gemma 4 E4B-IT LiteRT-LM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(R.string.settings_runtime_env), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(R.string.settings_current_backend, backendLabel), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.settings_token_usage, tokenCount, maxContextTokens, maxOutputTokens), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 
@@ -203,6 +225,17 @@ internal fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.btn_cancel)) }
+            }
+        )
+    }
+
+    if (showLicensesDialog) {
+        AlertDialog(
+            onDismissRequest = { showLicensesDialog = false },
+            title = { Text(stringResource(R.string.dialog_licenses_title)) },
+            text = { Text(stringResource(R.string.dialog_licenses_content)) },
+            confirmButton = {
+                TextButton(onClick = { showLicensesDialog = false }) { Text(stringResource(R.string.btn_dismiss)) }
             }
         )
     }

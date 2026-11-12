@@ -10,7 +10,6 @@
     <string name="status_model_prewarm_failed">AI 모델을 불러오지 못했습니다. 설정을 확인해 주세요.</string>
 
     <!-- 분석/답변 상태 -->
-    <string name="status_analyzing">촬영한 문제를 분석하고 있습니다.</string>
     <string name="status_analysis_empty">문제 분석 결과가 비어 있어 선택지를 표시하지 않았습니다.</string>
     <string name="status_ocr_empty">글자를 찾지 못했습니다. 다시 촬영해 주세요.</string>
     <string name="status_answer_empty_image">AI 답변을 받지 못했습니다. 다시 촬영해 분석을 시도해 주세요.</string>
@@ -34,6 +33,13 @@
     <string name="settings_model_status">모델 상태</string>
     <string name="settings_runtime_env">실행 환경: 기기 메모리에 맞춰 모델 로딩과 추론이 최적화됩니다.</string>
     <string name="settings_current_backend">현재 백엔드: %1$s</string>
+    <string name="settings_token_usage">대화 토큰 사용량: %1$d / %2$d 토큰 (출력 제한: %3$d 토큰)</string>
+    <string name="settings_btn_clear_cache">임시 파일 캐시 정리</string>
+    <string name="status_cache_cleared">임시 캐시 파일(%1$d개)을 정리했습니다.</string>
+    <string name="status_cache_empty">정리할 임시 캐시 파일이 없습니다.</string>
+    <string name="settings_btn_licenses">오픈소스 라이선스 및 버전 정보</string>
+    <string name="dialog_licenses_title">오픈소스 라이선스 및 버전 정보</string>
+    <string name="dialog_licenses_content">나만의 AI쌤 v0.0.1 (Build 1)\n\n• Jetpack Compose &amp; Material 3 (Apache 2.0)\n• LiteRT-LM Android 0.18.0 (Apache 2.0)\n• CameraX 1.6.2 (Apache 2.0)\n• ONNX Runtime Android 1.21.1 (MIT)\n• OpenCV 4.13.0 (Apache 2.0)\n• Compose LaTeX Renderer 1.7.2 (MIT)\n• Kotlin Coroutines (Apache 2.0)</string>
     <string name="settings_ocr_title">OCR 모델 및 출처</string>
     <string name="settings_ocr_details">인식 모델: korean_PP-OCRv5_mobile_rec\n검출 모델: models/det/inference.onnx (세부 모델 ID는 확인되지 않음)\n모델 문서: https://www.paddleocr.ai/latest/version3.x/module_usage/text_recognition.html\nAndroid SDK: https://github.com/PaddlePaddle/PaddleOCR/tree/main/deploy/ppocr-android</string>
 
@@ -52,8 +58,8 @@
 
     <string name="info_download_title">다운로드 안내</string>
     <string name="info_download_body">모델 파일은 약 3.66GB입니다. 요금이 발생할 수 있으니 반드시 Wi-Fi에서 다운로드하세요. 다운로드가 끝나면 AI 추론은 기기 안에서만 실행됩니다.</string>
-    <string name="info_learning_title">AI 생성기 학습 방식</string>
-    <string name="info_learning_body">개념 설명 → 핵심 원리 → 문제 적용 → 계산 단계 → 최종 답안 순으로 검산까지 설명합니다. 답변에 추가 질문을 이어서 학습할 수 있습니다.</string>
+    <string name="info_learning_title">나만의 AI쌤 학습 방식</string>
+    <string name="info_learning_body">1. PaddleOCR이 사진 속 글자를 인식합니다.\n2. 인식된 텍스트를 Gemma 4 E4B 온디바이스 AI가 분석해 핵심 해설을 제공합니다.\n3. 답변 끝에 제공되는 맞춤형 추천 질문 칩이나 직접 입력을 통해 이어서 학습할 수 있습니다.</string>
     <string name="info_privacy_title">개인정보 오프라인 처리</string>
     <string name="info_privacy_body">문제 촬영과 분석은 모두 기기 안에서 처리되며 외부 서버로 전송되지 않습니다. AI 분석 요청과 추가 질문도 같은 방식으로 처리됩니다. 최초 모델 다운로드 및 업데이트에만 인터넷이 필요합니다.</string>
 
@@ -70,6 +76,8 @@
     <string name="camera_title_confirm">사진 확인</string>
     <string name="camera_btn_retake">다시 촬영</string>
     <string name="camera_btn_confirm">확인</string>
+    <string name="camera_btn_select_all">선택 해제</string>
+    <string name="camera_selection_hint">문제가 있는 영역을 손가락으로 드래그하여 선택하세요</string>
     <string name="content_desc_captured_preview">촬영한 문제 미리보기</string>
     <string name="content_desc_close_camera">카메라 닫기</string>
     <string name="content_desc_take_photo">사진 촬영</string>
@@ -77,11 +85,17 @@
 
     <!-- 홈 화면 -->
     <string name="app_title">나만의 AI쌤</string>
-    <string name="home_title_generating">답변 생성 중</string>
-    <string name="home_title_generator">AI 생성기</string>
+    <string name="home_title_generator">문제 풀이</string>
+    <string name="home_stage_ocr">사진에서 글자를 읽는 중 · PaddleOCR</string>
+    <string name="home_stage_ocr_detail">PaddleOCR이 사진 속 글자를 인식하고 있습니다.</string>
+    <string name="home_stage_gemma">문제 풀이 중 · Gemma 4 E4B</string>
+    <string name="home_stage_gemma_detail">PaddleOCR이 읽은 텍스트를 Gemma 4 E4B에 전달해 풀이하고 있습니다.</string>
+    <string name="home_ocr_show">PaddleOCR 인식 내용 보기</string>
+    <string name="home_ocr_hide">PaddleOCR 인식 내용 숨기기</string>
+    <string name="home_ocr_explanation">Gemma 4 E4B는 사진을 직접 읽지 않고, 아래 PaddleOCR 인식 텍스트를 받아 풀이합니다.</string>
     <string name="home_empty_capture_prompt">문제를 촬영해 주세요.</string>
     <string name="home_empty_answer_placeholder">AI 풀이가 여기에 표시됩니다.</string>
-    <string name="home_empty_hint_after_capture">문제를 촬영하면 짧은 답변 후 원하는 설명을 고를 수 있습니다.</string>
+    <string name="home_empty_hint_after_capture">상단에서 과목을 선택하고 카메라를 누르면 나만의 AI 쌤이 바로 도와드려요.</string>
     <string name="home_empty_hint_need_model">AI 모델을 설치하면 촬영한 문제를 풀이할 수 있습니다.</string>
     <string name="home_btn_model_settings">AI 모델 설정</string>
     <string name="content_desc_select_subject">과목 선택</string>
@@ -99,6 +113,7 @@
 
     <!-- 후속 선택 -->
     <string name="followup_prompt_title">다음에 알고 싶은 내용을 선택하세요</string>
+    <string name="followup_custom_input">직접 입력</string>
     <!-- 모델 다운로드 상태 -->
     <string name="dl_msg_ready">AI 모델 설치 완료</string>
     <string name="dl_msg_not_installed">Gemma 4 E4B 모델이 설치되지 않았습니다.</string>

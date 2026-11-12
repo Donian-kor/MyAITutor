@@ -95,6 +95,10 @@ class GemmaAssistant(context: Context) : Assistant {
 
     override suspend fun backendLabel(): String = withContext(runtimeDispatcher) { selectedBackendLabel }
 
+    override suspend fun getTokenCount(): Int = withContext(runtimeDispatcher) {
+        runCatching { conversation?.getTokenCount() ?: 0 }.getOrElse { 0 }
+    }
+
     /**
      * 진행 중인 답변 생성을 중단합니다.
      * 런타임 스레드는 생성 중이라 대기할 수 없으므로, 네이티브 취소 플래그만

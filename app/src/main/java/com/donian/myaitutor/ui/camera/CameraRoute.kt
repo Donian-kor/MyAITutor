@@ -59,13 +59,13 @@ internal fun CameraRoute(
             uiState.cameraCapturedImage?.deleteQuietly()
             viewModel.clearCameraCapturedImage()
         },
-        onConfirm = {
+        onConfirm = { selection ->
             val image = uiState.cameraCapturedImage
             if (image != null) {
                 viewModel.confirmCapture(image)
                 onClose()
                 if (uiState.modelSnapshot.status == ModelDownloadStatus.READY) {
-                    viewModel.analyzeImage(image, selectedSubject)
+                    viewModel.analyzeImage(image, selectedSubject, selection)
                 } else {
                     viewModel.setStatusMessage(photoConfirmedNoModel)
                 }

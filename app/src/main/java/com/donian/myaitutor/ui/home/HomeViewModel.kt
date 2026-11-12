@@ -5,6 +5,8 @@ import android.util.Log
 import com.donian.myaitutor.R
 import com.donian.myaitutor.ai.Assistant
 import com.donian.myaitutor.ai.GemmaAssistant
+import com.donian.myaitutor.camera.ImageCropper
+import com.donian.myaitutor.camera.ImageSelection
 import com.donian.myaitutor.model.ModelDownloadManager
 import com.donian.myaitutor.model.ModelDownloadRepository
 import com.donian.myaitutor.model.ModelDownloadSnapshot
@@ -96,6 +98,8 @@ class HomeViewModel(
             capturedImage = null,
             answer = "",
             inputText = "",
+            analysisStage = null,
+            ocrText = "",
             showFollowUpChoices = false,
             statusMessage = null
         )
@@ -105,7 +109,9 @@ class HomeViewModel(
         _state.value = _state.value.copy(
             capturedImage = image,
             cameraCapturedImage = null,
-            cameraError = null
+            cameraError = null,
+            analysisStage = null,
+            ocrText = ""
         )
     }
 
@@ -121,12 +127,14 @@ class HomeViewModel(
         _state.value = _state.value.copy(cameraCapturedImage = null, cameraError = null)
     }
 
-    fun analyzeImage(image: File, subject: String) {
+    fun analyzeImage(image: File, subject: String, selection: ImageSelection? = null) {
         if (_state.value.isAnalyzing) return
         val currentGeneration = ++generationId
         _state.value = _state.value.copy(
             isAnalyzing = true,
-            answer = stringProvider.get(R.string.status_analyzing),
+            answer = "",
+            analysisStage = ImageAnalysisStage.OCR,
+            ocrText = "",
             showFollowUpChoices = false,
             statusMessage = null
         )
@@ -134,9 +142,18 @@ class HomeViewModel(
             var completed = false
             var receivedAnswer = false
             var imageToAnalyze = image
+            var normalizedImage: File? = null
             try {
-                imageToAnalyze = withContext(ioDispatcher) {
-                    com.donian.myaitutor.camera.ImageNormalizer.normalize(image) ?: image
+                if (selection != null) {
+                    normalizedImage = withContext(ioDispatcher) {
+                        ImageCropper.crop(image, selection)
+                    }
+                    imageToAnalyze = normalizedImage
+                } else {
+                    normalizedImage = withContext(ioDispatcher) {
+                        com.donian.myaitutor.camera.ImageNormalizer.normalize(image)
+                    }
+                    imageToAnalyze = normalizedImage ?: image
                 }
                 val ocrText = ocrTextRecognizer.recognize(imageToAnalyze).joinToString("\n")
                 // TODO: OCR 결과 텍스트의 Logcat 출력을 디버깅 종료 후 제거하세요.
@@ -148,6 +165,12 @@ class HomeViewModel(
                         )
                     }
                     return@launch
+                }
+                if (currentGeneration == generationId) {
+                    _state.value = _state.value.copy(
+                        ocrText = ocrText,
+                        analysisStage = ImageAnalysisStage.GEMMA
+                    )
                 }
                 assistant.analyzeImage(ocrText, subject) { newText ->
                     if (currentGeneration == generationId) {
@@ -176,11 +199,19 @@ class HomeViewModel(
                 }
             } finally {
                 runCatching { if (image.exists()) image.delete() }
-                if (imageToAnalyze != image) runCatching { if (imageToAnalyze.exists()) imageToAnalyze.delete() }
+                if (normalizedImage != null && normalizedImage != image) {
+                    runCatching { if (normalizedImage.exists()) normalizedImage.delete() }
+                }
+                if (imageToAnalyze != image && imageToAnalyze != normalizedImage) {
+                    runCatching { if (imageToAnalyze.exists()) imageToAnalyze.delete() }
+                }
                 if (currentGeneration == generationId) {
+                    val tokens = assistant.getTokenCount()
                     _state.value = _state.value.copy(
                         isAnalyzing = false,
-                        showFollowUpChoices = completed && receivedAnswer
+                        analysisStage = null,
+                        showFollowUpChoices = completed && receivedAnswer,
+                        tokenCount = tokens
                     )
                     generationJob = null
                 }
@@ -236,9 +267,11 @@ class HomeViewModel(
                 }
             } finally {
                 if (currentGeneration == generationId) {
+                    val tokens = assistant.getTokenCount()
                     _state.value = _state.value.copy(
                         isAnalyzing = false,
-                        showFollowUpChoices = completed && receivedAnswer && showChoicesAfterResponse
+                        showFollowUpChoices = completed && receivedAnswer && showChoicesAfterResponse,
+                        tokenCount = tokens
                     )
                     generationJob = null
                 }
@@ -290,6 +323,28 @@ class HomeViewModel(
                 _state.value = _state.value.copy(backendLabel = stringProvider.get(R.string.backend_label, assistant.backendLabel()))
             }
 
+        }
+    }
+
+    fun clearCache() {
+        scope.launch {
+            val clearedCount = withContext(ioDispatcher) {
+                var count = 0
+                val cacheDir = appContext.cacheDir
+                cacheDir.listFiles()?.forEach { file ->
+                    if (file.isFile && (file.name.startsWith("focus_") || file.name.endsWith(".jpg") || file.name.endsWith(".png"))) {
+                        if (file.delete()) count++
+                    }
+                }
+                count
+            }
+            _state.value = _state.value.copy(
+                statusMessage = if (clearedCount > 0) {
+                    stringProvider.get(R.string.status_cache_cleared, clearedCount)
+                } else {
+                    stringProvider.get(R.string.status_cache_empty)
+                }
+            )
         }
     }
 }

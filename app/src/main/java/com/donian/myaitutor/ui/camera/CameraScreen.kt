@@ -4,6 +4,7 @@ import android.app.Activity
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.exifinterface.media.ExifInterface
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,35 +20,47 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.donian.myaitutor.camera.CameraPreview
 import com.donian.myaitutor.R
 import com.donian.myaitutor.camera.CaptureImageAction
+import com.donian.myaitutor.camera.ExifImageTransform
+import com.donian.myaitutor.camera.ImageSelection
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -62,7 +75,7 @@ internal fun CameraScreen(
     onBack: () -> Unit,
     onCapture: () -> Unit,
     onRetake: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: (ImageSelection?) -> Unit
 ) {
     val view = LocalView.current
     val activity = view.context as? Activity
@@ -76,6 +89,7 @@ internal fun CameraScreen(
         }
     }
     val preview = capturedPreview
+    var selection by remember(capturedImage) { mutableStateOf<ImageSelection?>(null) }
 
     DisposableEffect(activity, view) {
         val controller = activity?.window?.let { WindowCompat.getInsetsController(it, view) }
@@ -109,13 +123,14 @@ internal fun CameraScreen(
             Image(
                 bitmap = preview.bitmap,
                 contentDescription = stringResource(R.string.content_desc_captured_preview),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        rotationZ = preview.rotation
-                        scaleX = preview.scaleX
-                    },
+                modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
+            )
+            ImageSelectionOverlay(
+                imageWidth = preview.bitmap.width,
+                imageHeight = preview.bitmap.height,
+                selection = selection,
+                onSelectionChanged = { selection = it }
             )
         }
 
@@ -138,7 +153,25 @@ internal fun CameraScreen(
                     if (capturedImage == null) stringResource(R.string.camera_title_capture) else stringResource(R.string.camera_title_confirm),
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                if (capturedImage != null && selection != null) {
+                    TextButton(onClick = { selection = null }) {
+                        Text(stringResource(R.string.camera_btn_select_all), color = Color.White)
+                    }
+                }
+            }
+
+            if (capturedImage != null) {
+                Text(
+                    stringResource(R.string.camera_selection_hint),
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
                 )
             }
 
@@ -180,14 +213,18 @@ internal fun CameraScreen(
                         .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    OutlinedButton(
+                    Button(
                         onClick = onRetake,
-                        modifier = Modifier.weight(1f).height(52.dp)
+                        modifier = Modifier.weight(1f).height(52.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Black.copy(alpha = 0.65f),
+                            contentColor = Color.White
+                        )
                     ) {
-                        Text(stringResource(R.string.camera_btn_retake))
+                        Text(stringResource(R.string.camera_btn_retake), fontWeight = FontWeight.Medium)
                     }
                     Button(
-                        onClick = onConfirm,
+                        onClick = { onConfirm(selection) },
                         modifier = Modifier.weight(1f).height(52.dp)
                     ) {
                         Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.content_desc_capture_confirm))
@@ -202,9 +239,7 @@ internal fun CameraScreen(
 
 /** 촬영 미리보기용 디코딩 결과. */
 private data class CapturedPreview(
-    val bitmap: ImageBitmap,
-    val rotation: Float,
-    val scaleX: Float
+    val bitmap: ImageBitmap
 )
 
 /** 미리보기 최대 장변(px). 원본 해상도 그대로 로드하지 않아 OOM을 막는다. */
@@ -229,15 +264,102 @@ private fun decodePreview(file: File): CapturedPreview? {
         ExifInterface.TAG_ORIENTATION,
         ExifInterface.ORIENTATION_NORMAL
     )
-    val (rotation, scaleX) = when (orientation) {
-        ExifInterface.ORIENTATION_ROTATE_90 -> 90f to 1f
-        ExifInterface.ORIENTATION_ROTATE_180 -> 180f to 1f
-        ExifInterface.ORIENTATION_ROTATE_270 -> 270f to 1f
-        ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> 0f to -1f
-        ExifInterface.ORIENTATION_FLIP_VERTICAL -> 180f to -1f
-        ExifInterface.ORIENTATION_TRANSPOSE -> 90f to -1f
-        ExifInterface.ORIENTATION_TRANSVERSE -> 270f to -1f
-        else -> 0f to 1f
-    }
-    return CapturedPreview(bitmap.asImageBitmap(), rotation, scaleX)
+    val oriented = ExifImageTransform.fromOrientation(orientation).apply(bitmap)
+    if (oriented !== bitmap) bitmap.recycle()
+    return CapturedPreview(oriented.asImageBitmap())
+}
+
+@Composable
+private fun ImageSelectionOverlay(
+    imageWidth: Int,
+    imageHeight: Int,
+    selection: ImageSelection?,
+    onSelectionChanged: (ImageSelection?) -> Unit
+) {
+    Spacer(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(imageWidth, imageHeight) {
+                val scale = minOf(size.width / imageWidth.toFloat(), size.height / imageHeight.toFloat())
+                val displayWidth = imageWidth * scale
+                val displayHeight = imageHeight * scale
+                val imageBounds = Rect(
+                    (size.width - displayWidth) / 2f,
+                    (size.height - displayHeight) / 2f,
+                    (size.width + displayWidth) / 2f,
+                    (size.height + displayHeight) / 2f
+                )
+                var dragStart: Offset? = null
+                var dragEnd: Offset? = null
+
+                fun selectionFor(start: Offset, end: Offset): ImageSelection? {
+                    val startX = (start.x - imageBounds.left).coerceIn(0f, displayWidth)
+                    val startY = (start.y - imageBounds.top).coerceIn(0f, displayHeight)
+                    val endX = (end.x - imageBounds.left).coerceIn(0f, displayWidth)
+                    val endY = (end.y - imageBounds.top).coerceIn(0f, displayHeight)
+                    return ImageSelection.fromPoints(
+                        startX, startY, endX, endY, displayWidth, displayHeight
+                    )
+                }
+
+                detectDragGestures(
+                    onDragStart = { point ->
+                        if (imageBounds.contains(point)) {
+                            dragStart = point
+                            dragEnd = point
+                        }
+                    },
+                    onDrag = { change, _ ->
+                        val start = dragStart
+                        if (start != null) {
+                            change.consume()
+                            dragEnd = change.position
+                            onSelectionChanged(selectionFor(start, change.position))
+                        }
+                    },
+                    onDragEnd = {
+                        val start = dragStart
+                        val end = dragEnd
+                        if (start != null && end != null) {
+                            onSelectionChanged(selectionFor(start, end))
+                        }
+                        dragStart = null
+                        dragEnd = null
+                    },
+                    onDragCancel = {
+                        dragStart = null
+                        dragEnd = null
+                    }
+                )
+            }
+            .drawWithCache {
+                val scale = minOf(size.width / imageWidth.toFloat(), size.height / imageHeight.toFloat())
+                val displayWidth = imageWidth * scale
+                val displayHeight = imageHeight * scale
+                val imageBounds = Rect(
+                    (size.width - displayWidth) / 2f,
+                    (size.height - displayHeight) / 2f,
+                    (size.width + displayWidth) / 2f,
+                    (size.height + displayHeight) / 2f
+                )
+                onDrawBehind {
+                    val region = selection ?: return@onDrawBehind
+                    val left = imageBounds.left + region.left * displayWidth
+                    val top = imageBounds.top + region.top * displayHeight
+                    val right = imageBounds.left + region.right * displayWidth
+                    val bottom = imageBounds.top + region.bottom * displayHeight
+                    val shade = Color.Black.copy(alpha = 0.48f)
+                    drawRect(shade, Offset(imageBounds.left, imageBounds.top), androidx.compose.ui.geometry.Size(imageBounds.width, top - imageBounds.top))
+                    drawRect(shade, Offset(imageBounds.left, bottom), androidx.compose.ui.geometry.Size(imageBounds.width, imageBounds.bottom - bottom))
+                    drawRect(shade, Offset(imageBounds.left, top), androidx.compose.ui.geometry.Size(left - imageBounds.left, bottom - top))
+                    drawRect(shade, Offset(right, top), androidx.compose.ui.geometry.Size(imageBounds.right - right, bottom - top))
+                    drawRect(
+                        color = Color(0xFF80CBC4),
+                        topLeft = Offset(left, top),
+                        size = androidx.compose.ui.geometry.Size(right - left, bottom - top),
+                        style = Stroke(width = 3.dp.toPx())
+                    )
+                }
+            }
+    )
 }

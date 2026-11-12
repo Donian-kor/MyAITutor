@@ -105,9 +105,13 @@ fun FocusAiApp() {
         SettingsScreen(
             snapshot = uiState.modelSnapshot,
             backendLabel = uiState.backendLabel,
+            tokenCount = uiState.tokenCount,
+            maxContextTokens = uiState.maxContextTokens,
+            maxOutputTokens = uiState.maxOutputTokens,
             onBack = { showSettings = false },
             onDownload = { viewModel.startDownload() },
-            onDeleteModel = { viewModel.deleteModel() }
+            onDeleteModel = { viewModel.deleteModel() },
+            onClearCache = { viewModel.clearCache() }
         )
     } else if (showCamera) {
         CameraRoute(
@@ -131,9 +135,11 @@ fun FocusAiApp() {
             onOpenSettings = { showSettings = true },
             onOpenCamera = ::openCamera,
             answer = uiState.answer,
+            ocrText = uiState.ocrText,
             inputText = uiState.inputText,
             onInputChange = { viewModel.onInputChange(it) },
             isAnalyzing = uiState.isAnalyzing,
+            analysisStage = uiState.analysisStage,
             statusMessage = uiState.statusMessage,
             onDismissStatus = { viewModel.dismissStatus() },
             onRetryAnalysis = {

@@ -8,6 +8,7 @@ interface Assistant {
     suspend fun analyzeImage(ocrText: String, subject: String, onTextChanged: suspend (String) -> Unit)
     suspend fun askFollowUp(question: String, onTextChanged: suspend (String) -> Unit)
     suspend fun backendLabel(): String
+    suspend fun getTokenCount(): Int
     fun cancelGeneration()
     suspend fun preWarm()
     suspend fun release()
