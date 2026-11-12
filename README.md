@@ -1,13 +1,15 @@
-# 나만의 AI쌤 (MyAITutor) Android — v0.0.1
+# 나만의 AI쌤 (MyAITutor) Android
 
-**나만의 AI쌤**은 카메라로 교과서·문제집을 비추고, 기기 안에서 실행되는 Gemma 4 E4B-IT에게 이미지와 질문을 전달해 개념 설명과 풀이를 받는 Android 온디바이스 AI 학습 도우미 앱입니다.
+**나만의 AI쌤**은 촬영한 문제의 글자를 기기 안의 PaddleOCR이 인식하고, 인식된 텍스트를 Gemma 4 E4B-IT가 분석해 개념 설명과 풀이를 제공하는 Android 온디바이스 학습 앱입니다. Gemma에는 원본 사진이 아니라 OCR 텍스트가 전달됩니다.
 
-## 0.0.1에 포함된 기능
+## 주요 기능
 
 - Jetpack Compose 기반 학습 및 AI 답변 화면
 - 별도 전체 화면 후면 카메라 촬영과 사진 확인·재촬영
-- 촬영 이미지 EXIF 방향 자동 회전 보정 및 다운스케일 정규화 (장변 1600px)
+- 촬영 사진 확인 화면에서 손가락으로 사각형 영역을 선택해 해당 부분만 OCR 처리 (선택하지 않으면 전체 사진 처리)
+- 선택 영역은 촬영 원본의 픽셀 해상도를 유지해 잘라내며, 전체 사진은 EXIF 방향 보정 후 장변 1600px 기준으로 정규화
 - 사진 확인 후 현재 선택 과목과 새 이미지를 기준으로 AI 풀이 자동 시작
+- PaddleOCR 인식 단계와 Gemma 풀이 단계를 화면에 구분해 표시하고, 인식 텍스트를 펼쳐 확인
 - 과목 선택 메뉴 (국어, 영어, 수학, 과학, 사회, 역사, 도덕·윤리, 기술·가정, 정보, 기타)
 - LaTeX 수식의 인라인·블록 렌더링 및 긴 수식 자동 줄바꿈
 - 짧은 첫 답변 뒤 후속 설명 선택 메뉴 (자세한 풀이·답변만·간략한 요약·다시 설명·직접 입력)
@@ -16,29 +18,40 @@
 - Hugging Face에서 Gemma 4 E4B `.litertlm` 파일 다운로드 (Wi-Fi 전용)
 - 모델 다운로드 후 SHA-256 체크섬 자동 무결성 검증
 - LiteRT-LM Kotlin API를 통한 GPU 우선 / CPU 대체 초기화
-- 촬영 이미지 + 과목 + 교사 지침을 모델에 전달
-- 생성 중인 답변을 화면에 실시간 스트리밍 표시 및 자동 스크롤
+- OCR 텍스트 + 과목 + 교사 지침을 Gemma에 전달
+- 생성 중인 답변을 실시간 스트리밍 표시하며 사용자가 스크롤 중일 때 읽던 위치 유지
 - 답변 생성 중단(Stop) 기능 지원
 - 같은 대화 세션에서 추가 질문 전송 및 새 문제 촬영 시 세션 초기화
 - 분석 후 임시 촬영 이미지 파일 자동 삭제
-- PP-OCR 보조 모듈 (`:ppocr-sdk`) 연동 구조 준비
+- PaddleOCR Android SDK (`:ppocr-sdk`)와 PP-OCR 모델을 앱에 포함
 
-## 아직 0.0.1에 포함하지 않은 기능
+## 아직 포함하지 않은 기능
 
 - Room 기반 학습 기록 및 대화의 앱 재시작 후 복원
 - 음성 입력 및 음성 답변
-- 이미지 영역 자르기·여러 문제 선택
+- 여러 개의 OCR 영역을 한 번에 지정하는 기능
 - 기기별 성능 프로파일과 자동 백엔드 선택
 
-첫 버전은 별도 OCR 모델 없이 Gemma 4 E4B의 이미지 이해 기능으로 문제를 직접 분석합니다. AI 답변의 `$...$` 및 `$$...$$` 형식 수식은 LaTeX 렌더러로 표시합니다.
+AI 답변의 `$...$` 및 `$$...$$` 형식 수식은 LaTeX 렌더러로 표시합니다.
+
+## OCR 및 AI 모델
+
+- **문자 검출 및 인식:** PaddleOCR Android SDK (`:ppocr-sdk`), ONNX Runtime 및 OpenCV 사용
+- **인식 모델:** `korean_PP-OCRv5_mobile_rec` (`ppocr-sdk/src/main/assets/models/rec/inference.yml`에서 확인)
+- **검출 모델:** `models/det/inference.onnx` (세부 모델 ID는 현재 파일에서 확인되지 않음)
+- **모델 출처:** [PaddleOCR 모델 문서](https://www.paddleocr.ai/latest/version3.x/module_usage/text_recognition.html), [PaddleOCR Android SDK](https://github.com/PaddlePaddle/PaddleOCR/tree/main/deploy/ppocr-android)
+- **풀이 모델:** [Gemma 4 E4B-IT LiteRT-LM](https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm)
+
+OCR 인식 텍스트는 홈 화면에서 확인할 수 있습니다. 선택 영역의 인식률은 사진 품질과 선택 범위에 따라 달라질 수 있으며 정확도를 보장하지 않습니다.
 
 ## 문제 풀이 사용법
 
 1. 상단 과목 메뉴에서 과목을 선택하고 하단 카메라 버튼으로 문제를 촬영합니다.
-2. 사진을 확인한 뒤 **확인**을 누르면, AI가 새 사진과 선택 과목을 바탕으로 핵심과 답을 먼저 간략히 설명합니다.
-3. 답변 아래의 **자세한 풀이**, **답변만**, **간략한 요약**, **다시 설명** 중 하나를 눌러 해당 방식으로 이어서 질문할 수 있습니다.
-4. **직접 입력**을 누르거나 하단 입력창을 사용해 궁금한 점을 입력합니다. 직접 입력 질문에는 AI가 질문 자체에 답하고 선택 메뉴를 자동으로 반복하지 않습니다.
-5. 다른 과목의 문제를 풀려면 과목을 바꾸고 새 사진을 촬영합니다. 새 과목을 선택하면 이전 사진과 대화 세션 상태가 초기화됩니다.
+2. 사진 확인 화면에서 필요한 경우 문제 부분을 손가락으로 사각형 드래그해 선택합니다. 선택하지 않으면 전체 사진을 처리합니다.
+3. **확인**을 누르면 PaddleOCR이 사진 또는 선택 영역에서 글자를 인식하고, Gemma 4 E4B가 인식된 텍스트와 선택 과목을 바탕으로 풀이합니다.
+4. **PaddleOCR 인식 내용 보기**를 눌러 Gemma에 전달된 텍스트를 확인할 수 있습니다.
+5. 답변 아래의 추천 질문을 누르거나 직접 입력해 설명을 이어갈 수 있습니다.
+6. 다른 과목의 문제를 풀려면 과목을 바꾸고 새 사진을 촬영합니다. 새 과목을 선택하면 이전 사진과 대화 세션 상태가 초기화됩니다.
 
 ## 개발 환경
 
@@ -51,6 +64,9 @@
 - Kotlin Compose Compiler: 2.4.21
 - LiteRT-LM Android: 0.18.0
 - CameraX: 1.6.2
+- PaddleOCR SDK: 저장소의 `:ppocr-sdk` 모듈
+- ONNX Runtime Android: 1.21.1
+- OpenCV Android: 4.13.0 (`org.opencv:opencv`, Maven Central)
 - Compose LaTeX Renderer: 1.7.2 (MIT)
 
 ## 프로젝트 열기
@@ -129,12 +145,13 @@ app/build/outputs/apk/debug/app-debug.apk
 - 앱 표시 이름: `나만의 AI쌤` (`@string/app_name`)
 - 앱 아이콘: `@drawable/app_icon`
 - Application ID: `com.donian.myaitutor`
-- Version Name: `0.0.1`
-- Version Code: `1`
+- 앱 버전은 `app/build.gradle.kts`에서 Git 커밋 수로 자동 계산합니다. `versionCode`는 커밋 수이며 `versionName`은 `0.<커밋 수 / 10>.<커밋 수 % 10>` 형식입니다. 예: 커밋 수 76이면 `0.7.6`; Debug 빌드에는 `-debug`가 붙습니다.
+- 출시용 키스토어 및 release 서명 설정은 아직 프로젝트에 추가되지 않았습니다.
 
 ## 알려진 제한
 
-- LiteRT-LM은 공식 Kotlin API를 사용하지만, Gemma 4 E4B의 이미지 입력 및 GPU/CPU 백엔드는 실제 대상 기기에서 검증해야 합니다.
+- Gemma 4 E4B는 현재 원본 이미지가 아닌 PaddleOCR 텍스트를 입력받습니다. OCR 결과와 풀이 정확도는 사진과 기기 환경에 따라 달라질 수 있습니다.
+- OpenCV 및 ONNX Runtime 네이티브 라이브러리는 `arm64-v8a`, `x86_64` 대상으로 구성되어 있습니다.
 - 수식은 표준 LaTeX 문법을 사용하는 경우 렌더링되며, 미지원 명령이나 비표준 문법은 텍스트로 표시될 수 있습니다.
 - 좁은 화면에서는 카메라 촬영 버튼이 아이콘으로 표시되고 입력창과 전송 버튼과 한 줄로 정렬됩니다.
 - AI 생성과 모델 해제는 한 번에 하나씩 처리합니다. 답변 생성 중에는 중단(Stop)을 누른 후 새 질문을 해야 합니다.
