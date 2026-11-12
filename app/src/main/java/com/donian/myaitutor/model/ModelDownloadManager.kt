@@ -4,6 +4,7 @@ import android.app.DownloadManager
 import androidx.core.net.toUri
 import androidx.core.content.edit
 import android.content.Context
+import com.donian.myaitutor.R
 import android.os.Environment
 import android.os.StatFs
 import java.io.IOException
@@ -34,13 +35,13 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
 
         if (completedPreviously && modelFile.isFile && modelFile.length() >= MIN_MODEL_BYTES) {
             if (EXPECTED_MODEL_SHA256.isNotEmpty() && preferences.getBoolean(KEY_HASH_MISMATCH, false)) {
-                return failedSnapshot("모델 파일 무결성 검증에 실패했습니다. 모델을 다시 다운로드해 주세요.")
+                return failedSnapshot(appContext.getString(R.string.dl_msg_hash_mismatch))
             }
             return ModelDownloadSnapshot(
                 status = ModelDownloadStatus.READY,
                 downloadedBytes = modelFile.length(),
                 totalBytes = EXPECTED_MODEL_BYTES,
-                message = "AI 모델 설치 완료"
+                message = appContext.getString(R.string.dl_msg_ready)
             )
         }
 
@@ -49,15 +50,15 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
                 status = ModelDownloadStatus.NOT_INSTALLED,
                 downloadedBytes = 0L,
                 totalBytes = EXPECTED_MODEL_BYTES,
-                message = "Gemma 4 E4B 모델이 설치되지 않았습니다."
+                message = appContext.getString(R.string.dl_msg_not_installed)
             )
         }
 
         val cursor = downloadManager.query(DownloadManager.Query().setFilterById(downloadId))
-            ?: return failedSnapshot("다운로드 상태를 확인할 수 없습니다.")
+            ?: return failedSnapshot(appContext.getString(R.string.dl_msg_status_unavailable))
 
         cursor.use {
-            if (!it.moveToFirst()) return failedSnapshot("다운로드 기록을 찾을 수 없습니다.")
+            if (!it.moveToFirst()) return failedSnapshot(appContext.getString(R.string.dl_msg_record_missing))
 
             val status = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
             val downloaded = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
@@ -66,20 +67,20 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
             return when (status) {
                 DownloadManager.STATUS_PENDING -> ModelDownloadSnapshot(
                     ModelDownloadStatus.QUEUED, downloaded, total,
-                    "다운로드 대기 중 · Wi-Fi 연결을 확인해 주세요."
+                    appContext.getString(R.string.dl_msg_queued)
                 )
                 DownloadManager.STATUS_RUNNING -> ModelDownloadSnapshot(
                     ModelDownloadStatus.DOWNLOADING, downloaded, total,
-                    "Gemma 4 E4B 모델 다운로드 중"
+                    appContext.getString(R.string.dl_msg_downloading)
                 )
                 DownloadManager.STATUS_PAUSED -> ModelDownloadSnapshot(
                     ModelDownloadStatus.PAUSED, downloaded, total,
-                    "다운로드 일시 중지 · Wi-Fi 연결을 확인해 주세요."
+                    appContext.getString(R.string.dl_msg_paused)
                 )
                 DownloadManager.STATUS_SUCCESSFUL -> {
                     if (modelFile.isFile && modelFile.length() >= MIN_MODEL_BYTES) {
                         if (EXPECTED_MODEL_SHA256.isNotEmpty() && preferences.getBoolean(KEY_HASH_MISMATCH, false)) {
-                            return failedSnapshot("모델 파일 무결성 검증에 실패했습니다. 모델을 다시 다운로드해 주세요.")
+                            return failedSnapshot(appContext.getString(R.string.dl_msg_hash_mismatch))
                         }
                         preferences.edit { putBoolean(KEY_COMPLETED, true) }
                         ModelDownloadSnapshot(
@@ -89,14 +90,14 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
                             "AI 모델 설치 완료"
                         )
                     } else {
-                        failedSnapshot("다운로드 파일 크기가 예상보다 작습니다. 모델을 다시 다운로드해 주세요.")
+                        failedSnapshot(appContext.getString(R.string.dl_msg_size_too_small))
                     }
                 }
                 DownloadManager.STATUS_FAILED -> {
                     val reason = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
-                    failedSnapshot("다운로드 실패 (오류 코드: $reason). 다시 시도해 주세요.")
+                    failedSnapshot(appContext.getString(R.string.dl_msg_failed_code, reason))
                 }
-                else -> failedSnapshot("알 수 없는 다운로드 상태입니다.")
+                else -> failedSnapshot(appContext.getString(R.string.dl_msg_unknown_status))
             }
         }
     }
@@ -106,7 +107,7 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
         val availableBytes = StatFs(storageDirectory.absolutePath).availableBytes
         val requiredBytes = EXPECTED_MODEL_BYTES + 600_000_000L
         if (availableBytes < requiredBytes) {
-            throw IOException("저장 공간이 부족합니다. 약 4.3GB 이상의 여유 공간을 확보해 주세요.")
+            throw IOException(appContext.getString(R.string.dl_msg_no_storage))
         }
 
         val existingId = preferences.getLong(KEY_DOWNLOAD_ID, -1L)
@@ -117,8 +118,8 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
         preferences.edit { putBoolean(KEY_COMPLETED, false) }
 
         val request = DownloadManager.Request(MODEL_DOWNLOAD_URL.toUri())
-            .setTitle("MyAITutor 모델 다운로드")
-            .setDescription("Gemma 4 E4B-IT · 약 3.66GB · Wi-Fi 전용")
+            .setTitle(appContext.getString(R.string.dl_notification_title))
+            .setDescription(appContext.getString(R.string.dl_notification_desc))
             .setMimeType("application/octet-stream")
             .setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI)
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
