@@ -1,6 +1,6 @@
 package com.donian.myaitutor.ui.home
 
-internal val Subjects = listOf("국어", "영어", "수학", "과학", "사회", "경제", "철학", "정보", "기타")
+internal val Subjects = listOf("국어", "수학", "영어", "과학", "사회", "역사", "도덕·윤리", "기술·가정", "정보", "기타")
 internal data class FollowUpChoice(val label: String, val prompt: String?)
 
 internal val FollowUpChoices = listOf(
