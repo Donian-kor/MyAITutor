@@ -41,10 +41,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.donian.myaitutor.camera.CameraPreview
+import com.donian.myaitutor.R
 import com.donian.myaitutor.camera.CaptureImageAction
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -106,7 +108,7 @@ internal fun CameraScreen(
         } else if (preview != null) {
             Image(
                 bitmap = preview.bitmap,
-                contentDescription = "촬영한 문제 미리보기",
+                contentDescription = stringResource(R.string.content_desc_captured_preview),
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
@@ -128,12 +130,12 @@ internal fun CameraScreen(
                 IconButton(onClick = onBack) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "카메라 닫기",
+                        contentDescription = stringResource(R.string.content_desc_close_camera),
                         tint = Color.White
                     )
                 }
                 Text(
-                    if (capturedImage == null) "문제 촬영" else "사진 확인",
+                    if (capturedImage == null) stringResource(R.string.camera_title_capture) else stringResource(R.string.camera_title_confirm),
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
@@ -166,7 +168,7 @@ internal fun CameraScreen(
                 ) {
                     Icon(
                         Icons.Default.CameraAlt,
-                        contentDescription = "사진 촬영",
+                        contentDescription = stringResource(R.string.content_desc_take_photo),
                         modifier = Modifier.size(30.dp)
                     )
                 }
@@ -182,15 +184,15 @@ internal fun CameraScreen(
                         onClick = onRetake,
                         modifier = Modifier.weight(1f).height(52.dp)
                     ) {
-                        Text("다시 촬영")
+                        Text(stringResource(R.string.camera_btn_retake))
                     }
                     Button(
                         onClick = onConfirm,
                         modifier = Modifier.weight(1f).height(52.dp)
                     ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = "촬영 확인")
+                        Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.content_desc_capture_confirm))
                         Spacer(Modifier.width(6.dp))
-                        Text("확인")
+                        Text(stringResource(R.string.camera_btn_confirm))
                     }
                 }
             }

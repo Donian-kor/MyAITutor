@@ -34,8 +34,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.donian.myaitutor.R
 
 /**
  * 하단 입력 바. 촬영 버튼 + 질문 입력창 + 전송/중단 버튼을 한 줄로 배치한다.
@@ -77,12 +79,12 @@ internal fun ComposerBar(
         ) {
             Icon(
                 Icons.Default.PhotoCamera,
-                contentDescription = if (compact) "문제 촬영" else null,
+                contentDescription = if (compact) stringResource(R.string.content_desc_capture_problem) else null,
                 modifier = Modifier.size(20.dp)
             )
             if (!compact) {
                 Spacer(Modifier.width(6.dp))
-                Text("촬영")
+                Text(stringResource(R.string.composer_btn_capture))
             }
         }
 
@@ -121,7 +123,7 @@ internal fun ComposerBar(
                         Box {
                             if (inputText.isEmpty()) {
                                 Text(
-                                    if (answer.isBlank()) "질문 입력" else "추가 질문 입력",
+                                    if (answer.isBlank()) stringResource(R.string.composer_hint_question) else stringResource(R.string.composer_hint_followup),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 1
@@ -145,7 +147,7 @@ internal fun ComposerBar(
                     contentColor = MaterialTheme.colorScheme.onErrorContainer
                 )
             ) {
-                Icon(Icons.Default.Stop, contentDescription = "답변 중단")
+                Icon(Icons.Default.Stop, contentDescription = stringResource(R.string.content_desc_stop_generation))
             }
         } else {
             FilledIconButton(
@@ -153,7 +155,7 @@ internal fun ComposerBar(
                 enabled = inputText.isNotBlank(),
                 modifier = Modifier.size(48.dp)
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "질문 보내기")
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.content_desc_send_question))
             }
         }
     }

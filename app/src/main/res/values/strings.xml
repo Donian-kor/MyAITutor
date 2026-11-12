@@ -62,4 +62,38 @@
     <!-- 공통 아이콘 설명 -->
     <string name="content_desc_back">뒤로</string>
     <string name="content_desc_model_installed">설치 완료</string>
+    <!-- 카메라 화면 -->
+    <string name="camera_title_capture">문제 촬영</string>
+    <string name="camera_title_confirm">사진 확인</string>
+    <string name="camera_btn_retake">다시 촬영</string>
+    <string name="camera_btn_confirm">확인</string>
+    <string name="content_desc_captured_preview">촬영한 문제 미리보기</string>
+    <string name="content_desc_close_camera">카메라 닫기</string>
+    <string name="content_desc_take_photo">사진 촬영</string>
+    <string name="content_desc_capture_confirm">촬영 확인</string>
+
+    <!-- 홈 화면 -->
+    <string name="app_title">나만의 AI쌤</string>
+    <string name="home_title_generating">답변 생성 중</string>
+    <string name="home_title_generator">AI 생성기</string>
+    <string name="home_empty_capture_prompt">문제를 촬영해 주세요.</string>
+    <string name="home_empty_answer_placeholder">AI 풀이가 여기에 표시됩니다.</string>
+    <string name="home_empty_hint_after_capture">문제를 촬영하면 짧은 답변 후 원하는 설명을 고를 수 있습니다.</string>
+    <string name="home_empty_hint_need_model">AI 모델을 설치하면 촬영한 문제를 풀이할 수 있습니다.</string>
+    <string name="home_btn_model_settings">AI 모델 설정</string>
+    <string name="content_desc_select_subject">과목 선택</string>
+    <string name="content_desc_open_settings">설정</string>
+    <string name="content_desc_ai_helper">AI 도우미</string>
+    <string name="content_desc_download_model">AI 모델 다운로드</string>
+
+    <!-- 입력 바 -->
+    <string name="composer_btn_capture">촬영</string>
+    <string name="composer_hint_question">질문 입력</string>
+    <string name="composer_hint_followup">추가 질문 입력</string>
+    <string name="content_desc_capture_problem">문제 촬영</string>
+    <string name="content_desc_stop_generation">답변 중단</string>
+    <string name="content_desc_send_question">질문 보내기</string>
+
+    <!-- 후속 선택 -->
+    <string name="followup_prompt_title">다음에 알고 싶은 내용을 선택하세요</string>
 </resources>

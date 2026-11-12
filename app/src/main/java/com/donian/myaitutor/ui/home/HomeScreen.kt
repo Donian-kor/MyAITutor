@@ -56,10 +56,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.donian.myaitutor.ui.home.Subjects
 import com.donian.myaitutor.ui.text.AssistantAnswer
+import com.donian.myaitutor.R
 import java.io.File
 
 @Composable
@@ -134,7 +136,7 @@ internal fun HomeScreen(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "나만의 AI쌤",
+                    text = stringResource(R.string.app_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
@@ -150,7 +152,7 @@ internal fun HomeScreen(
                         )
                     ) {
                         Text(selectedSubject, maxLines = 1)
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = "과목 선택")
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = stringResource(R.string.content_desc_select_subject))
                     }
                     DropdownMenu(
                         expanded = subjectMenuExpanded,
@@ -168,7 +170,7 @@ internal fun HomeScreen(
                     }
                 }
                 IconButton(onClick = onOpenSettings) {
-                    Icon(Icons.Default.Settings, contentDescription = "설정")
+                    Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.content_desc_open_settings))
                 }
             }
 
@@ -186,10 +188,10 @@ internal fun HomeScreen(
                         .padding(12.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.SmartToy, contentDescription = "AI 도우미", tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.SmartToy, contentDescription = stringResource(R.string.content_desc_ai_helper), tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            if (isAnalyzing) "답변 생성 중" else "AI 생성기",
+                            if (isAnalyzing) stringResource(R.string.home_title_generating) else stringResource(R.string.home_title_generator),
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f)
                         )
@@ -215,14 +217,14 @@ internal fun HomeScreen(
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                if (capturedImage == null) "문제를 촬영해 주세요." else "AI 풀이가 여기에 표시됩니다.",
+                                if (capturedImage == null) stringResource(R.string.home_empty_capture_prompt) else stringResource(R.string.home_empty_answer_placeholder),
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 if (modelReady) {
-                                    "문제를 촬영하면 짧은 답변 후 원하는 설명을 고를 수 있습니다."
+                                    stringResource(R.string.home_empty_hint_after_capture)
                                 } else {
-                                    "AI 모델을 설치하면 촬영한 문제를 풀이할 수 있습니다."
+                                    stringResource(R.string.home_empty_hint_need_model)
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -230,9 +232,9 @@ internal fun HomeScreen(
                             )
                             if (!modelReady) {
                                 TextButton(onClick = onOpenSettings) {
-                                    Icon(Icons.Default.CloudDownload, contentDescription = "AI 모델 다운로드")
+                                    Icon(Icons.Default.CloudDownload, contentDescription = stringResource(R.string.content_desc_download_model))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("AI 모델 설정")
+                                    Text(stringResource(R.string.home_btn_model_settings))
                                 }
                             }
                         }
