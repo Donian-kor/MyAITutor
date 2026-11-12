@@ -85,9 +85,10 @@ app/build/outputs/apk/debug/app-debug.apk
 
 - Hugging Face: https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm
 - 파일: `gemma-4-E4B-it.litertlm`
+- SHA-256 해시값: `0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0`
 - 모델 라이선스: 저장소 모델 카드 기준 Apache 2.0
 
-모델은 APK에 포함되지 않습니다. 앱 전용 다운로드 디렉터리에 저장하고 절대 경로로 LiteRT-LM에 전달합니다. 모델을 받은 뒤 이미지 분석과 답변 생성은 기기 내부에서 수행합니다. 모델 다운로드 및 Gradle 의존성 다운로드는 인터넷이 필요합니다. 이 버전은 파일 크기 기반 기본 검사만 수행하며, SHA-256 체크섬 검증은 아직 연결하지 않았습니다.
+모델은 APK에 포함되지 않습니다. 앱 전용 다운로드 디렉터리에 저장하고 절대 경로로 LiteRT-LM에 전달합니다. 모델을 받은 뒤 이미지 분석과 답변 생성은 기기 내부에서 수행합니다. 모델 다운로드 및 Gradle 의존성 다운로드는 인터넷이 필요합니다. 파일 크기와 SHA-256 체크섬을 모두 검증하며, 검증 실패 시 재다운로드를 안내합니다.
 
 ## 기기 성능 주의
 
@@ -97,6 +98,26 @@ app/build/outputs/apk/debug/app-debug.apk
 - GPU 및 CPU 초기화가 모두 실패하면 오류를 표시합니다.
 - 기기의 RAM, GPU 드라이버, Android 버전 및 발열 제한에 따라 지원 여부가 달라집니다.
 - 실제 출시 전에 삼성·픽셀 등 목표 기기에서 카메라와 모델을 동시에 실행하는 테스트가 필요합니다.
+
+### 권장 사양 및 기기 호환성
+
+- **최소 하드웨어 사양**: 64비트(arm64-v8a) OS, 최소 6GB RAM (8GB RAM 이상 권장)
+- **미지원 원인**: 3.66GB 모델 가중치, 대화 KV 캐시, OS 메모리로 인해 RAM 4GB 이하 기기는 모델 로딩 시 메모리 부족(OOM)으로 앱이 강제 종료됩니다.
+
+#### ❌ 미지원 기기 (RAM 4GB 이하 또는 32비트 — OOM 튕김 발생)
+- **갤럭시 A / M / F 시리즈 (저가형)**: Galaxy A01~A05, A10~A15, A20~A25, A30~A33 (RAM 4GB 이하 모델), M10~M33, F12~F23 등
+- **갤럭시 탭 (저가형 태블릿)**: Galaxy Tab A7 / A7 Lite, Tab A8 10.5, Tab A9 / A9+ (RAM 4GB 옵션), Tab Active3
+- **구형 갤럭시 플래그십**: Galaxy S7 / S7 Edge, S8 / S8+, S9 기본형 (RAM 4GB), Note 8 등
+
+#### ⚠️ 미지원 권장 또는 주의 기기 (RAM 6GB 모델 — 카메라+AI 동시 실행 시 튕김 위험)
+- Galaxy S9+ / Note 9 (RAM 6GB 모델), S10e / S10 / S10+ (RAM 6GB 옵션), S20 FE / S21 FE (RAM 6GB 옵션)
+- Galaxy A34 5G / A35 5G / A51 5G / A52 / A53 5G / A54 5G (RAM 6GB 옵션 모델)
+
+#### ✅ 정상 지원 권장 기기 (RAM 8GB 이상)
+- **갤럭시 S 시리즈**: Galaxy S20 / S21 / S22 / S23 / S24 시리즈 (S20 Ultra, S21~S24 전 모델 등)
+- **갤럭시 폴더블 시리즈**: Galaxy Z Fold 2 / Fold 3 / Fold 4 / Fold 5 / Fold 6, Z Flip 3 / Flip 4 / Flip 5 / Flip 6
+- **갤럭시 탭 고성능 라인업**: Galaxy Tab S7 / S7+, Tab S8 / S8+ / S8 Ultra, Tab S9 / S9+ / S9 Ultra, Tab S10+ / S10 Ultra
+- **갤럭시 A 시리즈 (고성능 모델)**: Galaxy A54 5G / A55 5G (RAM 8GB 이상 선택 모델)
 
 ## 개인정보 처리
 
