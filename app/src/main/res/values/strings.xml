@@ -27,4 +27,39 @@
     <!-- 공통 버튼 -->
     <string name="btn_retry">다시 시도</string>
     <string name="btn_dismiss">닫기</string>
+    <!-- 설정 화면 -->
+    <string name="settings_title">설정</string>
+    <string name="settings_engine_desc">LiteRT-LM · 온디바이스 멀티모달 AI</string>
+    <string name="settings_model_status">모델 상태</string>
+    <string name="settings_runtime_env">실행 환경: 기기 메모리에 맞춰 모델 로딩과 추론이 최적화됩니다.</string>
+    <string name="settings_current_backend">현재 백엔드: %1$s</string>
+
+    <string name="model_status_ready">설치 완료</string>
+    <string name="model_status_downloading">다운로드 중</string>
+    <string name="model_status_queued">대기 중</string>
+    <string name="model_status_paused">일시 중지</string>
+    <string name="model_status_failed">오류</string>
+    <string name="model_status_not_installed">미설치</string>
+
+    <string name="settings_model_found">모델 파일을 찾았습니다. AI 분석을 바로 사용할 수 있습니다.</string>
+    <string name="settings_btn_model_delete">모델 삭제</string>
+    <string name="settings_btn_download_retry">다시 다운로드</string>
+    <string name="settings_btn_download_resume">다시 시도</string>
+    <string name="settings_btn_download">AI 모델 다운로드</string>
+
+    <string name="info_download_title">다운로드 안내</string>
+    <string name="info_download_body">모델 파일은 약 3.66GB입니다. 요금이 발생할 수 있으니 반드시 Wi-Fi에서 다운로드하세요. 다운로드가 끝나면 AI 추론은 기기 안에서만 실행됩니다.</string>
+    <string name="info_learning_title">AI 생성기 학습 방식</string>
+    <string name="info_learning_body">개념 설명 → 핵심 원리 → 문제 적용 → 계산 단계 → 최종 답안 순으로 검산까지 설명합니다. 답변에 추가 질문을 이어서 학습할 수 있습니다.</string>
+    <string name="info_privacy_title">개인정보 오프라인 처리</string>
+    <string name="info_privacy_body">문제 촬영과 분석은 모두 기기 안에서 처리되며 외부 서버로 전송되지 않습니다. AI 분석 요청과 추가 질문도 같은 방식으로 처리됩니다. 최초 모델 다운로드 및 업데이트에만 인터넷이 필요합니다.</string>
+
+    <string name="dialog_delete_model_title">AI 모델을 삭제할까요?</string>
+    <string name="dialog_delete_model_message">약 3.66GB의 모델 파일을 기기에서 모두 삭제합니다. 다시 사용하려면 재다운로드가 필요합니다.</string>
+    <string name="btn_delete">삭제</string>
+    <string name="btn_cancel">취소</string>
+
+    <!-- 공통 아이콘 설명 -->
+    <string name="content_desc_back">뒤로</string>
+    <string name="content_desc_model_installed">설치 완료</string>
 </resources>

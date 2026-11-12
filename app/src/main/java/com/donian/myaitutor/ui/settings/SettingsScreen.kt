@@ -48,8 +48,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.donian.myaitutor.R
 import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelDownloadStatus
 import com.donian.myaitutor.ui.components.InfoCard
@@ -82,9 +84,9 @@ internal fun SettingsScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로", modifier = Modifier.size(25.dp))
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.content_desc_back), modifier = Modifier.size(25.dp))
                 }
-                Text("설정", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
 
             Card(
@@ -98,20 +100,20 @@ internal fun SettingsScreen(
                         Spacer(Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Gemma 4 E4B-IT", fontWeight = FontWeight.Bold)
-                            Text("LiteRT-LM · 온디바이스 멀티모달 AI", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.settings_engine_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("모델 상태", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.settings_model_status), modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             when (snapshot.status) {
-                                ModelDownloadStatus.READY -> "설치 완료"
-                                ModelDownloadStatus.DOWNLOADING -> "다운로드 중"
-                                ModelDownloadStatus.QUEUED -> "대기 중"
-                                ModelDownloadStatus.PAUSED -> "일시 중지"
-                                ModelDownloadStatus.FAILED -> "오류"
-                                ModelDownloadStatus.NOT_INSTALLED -> "미설치"
+                                ModelDownloadStatus.READY -> stringResource(R.string.model_status_ready)
+                                ModelDownloadStatus.DOWNLOADING -> stringResource(R.string.model_status_downloading)
+                                ModelDownloadStatus.QUEUED -> stringResource(R.string.model_status_queued)
+                                ModelDownloadStatus.PAUSED -> stringResource(R.string.model_status_paused)
+                                ModelDownloadStatus.FAILED -> stringResource(R.string.model_status_failed)
+                                ModelDownloadStatus.NOT_INSTALLED -> stringResource(R.string.model_status_not_installed)
                             },
                             fontWeight = FontWeight.SemiBold,
                             color = if (snapshot.status == ModelDownloadStatus.READY) Color(0xFF16845B) else MaterialTheme.colorScheme.onSurface
@@ -131,14 +133,14 @@ internal fun SettingsScreen(
                     }
                     if (snapshot.status == ModelDownloadStatus.READY) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = "설치 완료", tint = Color(0xFF16845B))
+                            Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.content_desc_model_installed), tint = Color(0xFF16845B))
                             Spacer(Modifier.width(7.dp))
-                            Text("모델 파일을 찾았습니다. AI 분석을 바로 사용할 수 있습니다.", style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(R.string.settings_model_found), style = MaterialTheme.typography.bodySmall)
                         }
                         OutlinedButton(onClick = { showDeleteDialog = true }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.DeleteOutline, contentDescription = "모델 삭제")
+                            Icon(Icons.Default.DeleteOutline, contentDescription = stringResource(R.string.settings_btn_model_delete))
                             Spacer(Modifier.width(7.dp))
-                            Text("모델 삭제")
+                            Text(stringResource(R.string.settings_btn_model_delete))
                         }
                     } else {
                         Button(
@@ -148,13 +150,13 @@ internal fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp)
                         ) {
-                            Icon(Icons.Default.CloudDownload, contentDescription = "AI 모델 다운로드")
+                            Icon(Icons.Default.CloudDownload, contentDescription = stringResource(R.string.settings_btn_download))
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 when (snapshot.status) {
-                                    ModelDownloadStatus.FAILED -> "다시 다운로드"
-                                    ModelDownloadStatus.PAUSED, ModelDownloadStatus.QUEUED -> "다시 시도"
-                                    else -> "AI 모델 다운로드"
+                                    ModelDownloadStatus.FAILED -> stringResource(R.string.settings_btn_download_retry)
+                                    ModelDownloadStatus.PAUSED, ModelDownloadStatus.QUEUED -> stringResource(R.string.settings_btn_download_resume)
+                                    else -> stringResource(R.string.settings_btn_download)
                                 }
                             )
                         }
@@ -164,38 +166,38 @@ internal fun SettingsScreen(
 
             InfoCard(
                 icon = { Icon(Icons.Default.Wifi, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                title = "다운로드 안내",
-                body = "모델 파일은 약 3.66GB입니다. 요금이 발생할 수 있으니 반드시 Wi-Fi에서 다운로드하세요. 다운로드가 끝나면 AI 추론은 기기 안에서만 실행됩니다."
+                title = stringResource(R.string.info_download_title),
+                body = stringResource(R.string.info_download_body)
             )
             InfoCard(
                 icon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                title = "AI 생성기 학습 방식",
-                body = "개념 설명 → 핵심 원리 → 문제 적용 → 계산 단계 → 최종 답안 순으로 검산까지 설명합니다. 답변에 추가 질문을 이어서 학습할 수 있습니다."
+                title = stringResource(R.string.info_learning_title),
+                body = stringResource(R.string.info_learning_body)
             )
             InfoCard(
                 icon = { Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                title = "개인정보 오프라인 처리",
-                body = "문제 촬영과 분석은 모두 기기 안에서 처리되며 외부 서버로 전송되지 않습니다. AI 분석 요청과 추가 질문도 같은 방식으로 처리됩니다. 최초 모델 다운로드 및 업데이트에만 인터넷이 필요합니다."
+                title = stringResource(R.string.info_privacy_title),
+                body = stringResource(R.string.info_privacy_body)
             )
             Text("나만의 AI쌤 0.0.1 · Gemma 4 E4B-IT LiteRT-LM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("실행 환경: 기기 메모리에 맞춰 모델 로딩과 추론이 최적화됩니다.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("현재 백엔드: $backendLabel", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.settings_runtime_env), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.settings_current_backend, backendLabel), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("AI 모델을 삭제할까요?") },
-            text = { Text("약 3.66GB의 모델 파일을 기기에서 모두 삭제합니다. 다시 사용하려면 재다운로드가 필요합니다.") },
+            title = { Text(stringResource(R.string.dialog_delete_model_title)) },
+            text = { Text(stringResource(R.string.dialog_delete_model_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     showDeleteDialog = false
                     onDeleteModel()
-                }) { Text("삭제") }
+                }) { Text(stringResource(R.string.btn_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("취소") }
+                TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.btn_cancel)) }
             }
         )
     }
