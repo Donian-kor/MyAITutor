@@ -1,6 +1,7 @@
 package com.donian.myaitutor.ui.home
 
 import android.content.Context
+import com.donian.myaitutor.R
 import com.donian.myaitutor.ai.Assistant
 import com.donian.myaitutor.ai.GemmaAssistant
 import com.donian.myaitutor.model.ModelDownloadManager
@@ -29,7 +30,8 @@ class HomeViewModel(
     private val assistant: Assistant = GemmaAssistant(appContext),
     private val scope: CoroutineScope,
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
-    private val enablePolling: Boolean = true
+    private val enablePolling: Boolean = true,
+    private val stringProvider: (Int) -> String = { appContext.getString(it) }
 ) {
 
     private val _state = kotlinx.coroutines.flow.MutableStateFlow(
@@ -111,7 +113,7 @@ class HomeViewModel(
         val currentGeneration = ++generationId
         _state.value = _state.value.copy(
             isAnalyzing = true,
-            answer = "촬영한 문제를 분석하고 있습니다.",
+            answer = stringProvider(R.string.status_analyzing),
             showFollowUpChoices = false,
             statusMessage = null
         )
@@ -134,8 +136,8 @@ class HomeViewModel(
                     completed = true
                     if (!receivedAnswer) {
                         _state.value = _state.value.copy(
-                            answer = "AI 답변을 받지 못했습니다. 다시 촬영해 분석을 시도해 주세요.",
-                            statusMessage = "문제 분석 결과가 비어 있어 선택지를 표시하지 않았습니다."
+                            answer = stringProvider(R.string.status_answer_empty_image),
+                            statusMessage = stringProvider(R.string.status_analysis_empty)
                         )
                     }
                 }
@@ -144,7 +146,7 @@ class HomeViewModel(
             } catch (error: Exception) {
                 if (currentGeneration == generationId) {
                     _state.value = _state.value.copy(
-                        statusMessage = error.localizedMessage ?: "AI 분석 중 오류가 발생했습니다."
+                        statusMessage = error.localizedMessage ?: stringProvider(R.string.status_analysis_error)
                     )
                 }
             } finally {
@@ -165,7 +167,7 @@ class HomeViewModel(
         if (question.isBlank() || _state.value.isAnalyzing) return
         if (_state.value.modelSnapshot.status != ModelDownloadStatus.READY) {
             _state.value = _state.value.copy(
-                statusMessage = "AI 모델을 먼저 설치해 주세요."
+                statusMessage = stringProvider(R.string.status_model_required)
             )
             return
         }
@@ -199,7 +201,7 @@ class HomeViewModel(
                     completed = true
                     if (!receivedAnswer) {
                         _state.value = _state.value.copy(
-                            statusMessage = "AI 답변을 받지 못했습니다. 다시 질문해 주세요."
+                            statusMessage = stringProvider(R.string.status_answer_empty_followup)
                         )
                     }
                 }
@@ -208,7 +210,7 @@ class HomeViewModel(
             } catch (error: Exception) {
                 if (currentGeneration == generationId) {
                     _state.value = _state.value.copy(
-                        statusMessage = error.localizedMessage ?: "질문 처리 중 오류가 발생했습니다."
+                        statusMessage = error.localizedMessage ?: stringProvider(R.string.status_question_error)
                     )
                 }
             } finally {
@@ -232,11 +234,11 @@ class HomeViewModel(
         scope.launch {
             runCatching { modelManager.startDownload() }
                 .onSuccess {
-                    _state.value = _state.value.copy(statusMessage = "Wi-Fi에서 AI 모델 다운로드가 시작됩니다.")
+                    _state.value = _state.value.copy(statusMessage = stringProvider(R.string.status_download_started))
                 }
                 .onFailure {
                     _state.value = _state.value.copy(
-                        statusMessage = it.localizedMessage ?: "다운로드를 시작하지 못했습니다."
+                        statusMessage = it.localizedMessage ?: stringProvider(R.string.status_download_failed)
                     )
                 }
             _state.value = _state.value.copy(modelSnapshot = modelManager.snapshot())
@@ -249,7 +251,7 @@ class HomeViewModel(
             modelManager.deleteModel()
             _state.value = _state.value.copy(
                 modelSnapshot = modelManager.snapshot(),
-                backendLabel = "모델이 모두 삭제되었습니다."
+                backendLabel = stringProvider(R.string.status_model_deleted)
             )
         }
     }

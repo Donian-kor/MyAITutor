@@ -131,7 +131,7 @@ internal fun SettingsScreen(
                     }
                     if (snapshot.status == ModelDownloadStatus.READY) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF16845B))
+                            Icon(Icons.Default.CheckCircle, contentDescription = "설치 완료", tint = Color(0xFF16845B))
                             Spacer(Modifier.width(7.dp))
                             Text("모델 파일을 찾았습니다. AI 분석을 바로 사용할 수 있습니다.", style = MaterialTheme.typography.bodySmall)
                         }

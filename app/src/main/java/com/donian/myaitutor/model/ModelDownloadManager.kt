@@ -7,6 +7,7 @@ import android.os.Environment
 import android.os.StatFs
 import java.io.IOException
 import java.io.File
+import java.util.Locale
 import kotlinx.coroutines.withContext
 
 /**
@@ -235,6 +236,11 @@ data class ModelDownloadSnapshot(
     internal fun formatBytes(bytes: Long): String {
         if (bytes <= 0L) return "0 MB"
         val gb = bytes / 1_000_000_000.0
-        return if (gb >= 1.0) String.format("%.2f GB", gb) else String.format("%.0f MB", bytes / 1_000_000.0)
+        val locale = Locale.getDefault()
+        return if (gb >= 1.0) {
+            String.format(locale, "%.2f GB", gb)
+        } else {
+            String.format(locale, "%.0f MB", bytes / 1_000_000.0)
+        }
     }
 }

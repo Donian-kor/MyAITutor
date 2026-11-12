@@ -195,7 +195,7 @@ internal fun CameraScreen(
                         onClick = onConfirm,
                         modifier = Modifier.weight(1f).height(52.dp)
                     ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null)
+                        Icon(Icons.Default.CheckCircle, contentDescription = "촬영 확인")
                         Spacer(Modifier.width(6.dp))
                         Text("확인")
                     }

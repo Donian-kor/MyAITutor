@@ -230,7 +230,7 @@ internal fun HomeScreen(
                             )
                             if (!modelReady) {
                                 TextButton(onClick = onOpenSettings) {
-                                    Icon(Icons.Default.CloudDownload, contentDescription = null)
+                                    Icon(Icons.Default.CloudDownload, contentDescription = "AI 모델 다운로드")
                                     Spacer(Modifier.width(4.dp))
                                     Text("AI 모델 설정")
                                 }

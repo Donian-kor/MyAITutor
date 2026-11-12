@@ -53,7 +53,7 @@ class HomeViewModelTest {
     @Test
     fun `analyzeImage는 완료 후 isAnalyzing을 false로 되돌린다`() = runTest {
         val app = TestApp()
-        val vm = HomeViewModel(app, FakeRepo(), FakeAssistant(), this, kotlinx.coroutines.Dispatchers.Unconfined, false)
+        val vm = HomeViewModel(app, FakeRepo(), FakeAssistant(), this, kotlinx.coroutines.Dispatchers.Unconfined, false) { "테스트" }
         val file = File.createTempFile("img", ".jpg")
         vm.analyzeImage(file, "수학")
         testScheduler.advanceUntilIdle()
@@ -66,7 +66,7 @@ class HomeViewModelTest {
     fun `isAnalyzing 중에는 중복 analyzeImage가 무시된다`() = runTest {
         val assistant = FakeAssistant()
         val app = TestApp()
-        val vm = HomeViewModel(app, FakeRepo(), assistant, this, kotlinx.coroutines.Dispatchers.Unconfined, false)
+        val vm = HomeViewModel(app, FakeRepo(), assistant, this, kotlinx.coroutines.Dispatchers.Unconfined, false) { "테스트" }
         val file = File.createTempFile("img", ".jpg")
         vm.analyzeImage(file, "수학")
         vm.analyzeImage(file, "수학")
@@ -79,7 +79,7 @@ class HomeViewModelTest {
     fun `모델이 없으면 sendQuestion은 상태 메시지를 남기고 실행하지 않는다`() = runTest {
         val assistant = FakeAssistant()
         val app = TestApp()
-        val vm = HomeViewModel(app, FakeRepo(ready = false), assistant, this, kotlinx.coroutines.Dispatchers.Unconfined, false)
+        val vm = HomeViewModel(app, FakeRepo(ready = false), assistant, this, kotlinx.coroutines.Dispatchers.Unconfined, false) { "테스트" }
         vm.sendQuestion("이게 뭐야?")
         testScheduler.advanceUntilIdle()
         assertEquals(0, assistant.askFollowUpCalls)
@@ -90,7 +90,7 @@ class HomeViewModelTest {
     fun `cancelGeneration은 assistant cancel을 호출한다`() = runTest {
         val assistant = FakeAssistant()
         val app = TestApp()
-        val vm = HomeViewModel(app, FakeRepo(), assistant, this, kotlinx.coroutines.Dispatchers.Unconfined, false)
+        val vm = HomeViewModel(app, FakeRepo(), assistant, this, kotlinx.coroutines.Dispatchers.Unconfined, false) { "테스트" }
         vm.cancelGeneration()
         assertEquals(1, assistant.cancelCalls)
     }
