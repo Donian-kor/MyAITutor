@@ -44,3 +44,13 @@ internal fun followUpPrompt(question: String): String = """
             학생의 질문:
             $question
         """.trimIndent()
+
+/**
+ * 후속 질문 답변 접두사. 이전 답변과 새 질문을 이어 붙인다.
+ */
+internal fun followUpAnswerPrefix(previousAnswer: String, question: String): String =
+    if (previousAnswer.isBlank()) {
+        "학생: $question\n\nAI 답변: "
+    } else {
+        "$previousAnswer\n\n학생: $question\n\nAI 답변: "
+    }

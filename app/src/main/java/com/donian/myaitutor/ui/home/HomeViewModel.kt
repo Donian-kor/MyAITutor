@@ -31,7 +31,7 @@ class HomeViewModel(
     private val scope: CoroutineScope,
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
     private val enablePolling: Boolean = true,
-    private val stringProvider: (Int) -> String = { appContext.getString(it) }
+    private val stringProvider: StringProvider = StringProvider { resId, args -> appContext.getString(resId, *args) }
 ) {
 
     private val _state = kotlinx.coroutines.flow.MutableStateFlow(
@@ -117,7 +117,7 @@ class HomeViewModel(
         val currentGeneration = ++generationId
         _state.value = _state.value.copy(
             isAnalyzing = true,
-            answer = stringProvider(R.string.status_analyzing),
+            answer = stringProvider.get(R.string.status_analyzing),
             showFollowUpChoices = false,
             statusMessage = null
         )
@@ -136,12 +136,12 @@ class HomeViewModel(
                 }
                 if (currentGeneration == generationId) {
                     val label = assistant.backendLabel()
-                    _state.value = _state.value.copy(backendLabel = "실행 백엔드: $label")
+                    _state.value = _state.value.copy(backendLabel = stringProvider.get(R.string.backend_label, label))
                     completed = true
                     if (!receivedAnswer) {
                         _state.value = _state.value.copy(
-                            answer = stringProvider(R.string.status_answer_empty_image),
-                            statusMessage = stringProvider(R.string.status_analysis_empty)
+                            answer = stringProvider.get(R.string.status_answer_empty_image),
+                            statusMessage = stringProvider.get(R.string.status_analysis_empty)
                         )
                     }
                 }
@@ -150,7 +150,7 @@ class HomeViewModel(
             } catch (error: Exception) {
                 if (currentGeneration == generationId) {
                     _state.value = _state.value.copy(
-                        statusMessage = error.localizedMessage ?: stringProvider(R.string.status_analysis_error)
+                        statusMessage = error.localizedMessage ?: stringProvider.get(R.string.status_analysis_error)
                     )
                 }
             } finally {
@@ -171,17 +171,13 @@ class HomeViewModel(
         if (question.isBlank() || _state.value.isAnalyzing) return
         if (_state.value.modelSnapshot.status != ModelDownloadStatus.READY) {
             _state.value = _state.value.copy(
-                statusMessage = stringProvider(R.string.status_model_required)
+                statusMessage = stringProvider.get(R.string.status_model_required)
             )
             return
         }
         val currentGeneration = ++generationId
         val previousAnswer = _state.value.answer
-        val pendingAnswer = if (previousAnswer.isBlank()) {
-            "학생: $question\n\nAI 답변: "
-        } else {
-            "$previousAnswer\n\n학생: $question\n\nAI 답변: "
-        }
+        val pendingAnswer = com.donian.myaitutor.ai.followUpAnswerPrefix(previousAnswer, question)
         _state.value = _state.value.copy(
             isAnalyzing = true,
             answer = pendingAnswer,
@@ -201,11 +197,11 @@ class HomeViewModel(
                 }
                 if (currentGeneration == generationId) {
                     val label = assistant.backendLabel()
-                    _state.value = _state.value.copy(backendLabel = "실행 백엔드: $label")
+                    _state.value = _state.value.copy(backendLabel = stringProvider.get(R.string.backend_label, label))
                     completed = true
                     if (!receivedAnswer) {
                         _state.value = _state.value.copy(
-                            statusMessage = stringProvider(R.string.status_answer_empty_followup)
+                            statusMessage = stringProvider.get(R.string.status_answer_empty_followup)
                         )
                     }
                 }
@@ -214,7 +210,7 @@ class HomeViewModel(
             } catch (error: Exception) {
                 if (currentGeneration == generationId) {
                     _state.value = _state.value.copy(
-                        statusMessage = error.localizedMessage ?: stringProvider(R.string.status_question_error)
+                        statusMessage = error.localizedMessage ?: stringProvider.get(R.string.status_question_error)
                     )
                 }
             } finally {
@@ -238,11 +234,11 @@ class HomeViewModel(
         scope.launch {
             runCatching { modelManager.startDownload() }
                 .onSuccess {
-                    _state.value = _state.value.copy(statusMessage = stringProvider(R.string.status_download_started))
+                    _state.value = _state.value.copy(statusMessage = stringProvider.get(R.string.status_download_started))
                 }
                 .onFailure {
                     _state.value = _state.value.copy(
-                        statusMessage = it.localizedMessage ?: stringProvider(R.string.status_download_failed)
+                        statusMessage = it.localizedMessage ?: stringProvider.get(R.string.status_download_failed)
                     )
                 }
             _state.value = _state.value.copy(modelSnapshot = modelManager.snapshot())
@@ -255,7 +251,7 @@ class HomeViewModel(
             modelManager.deleteModel()
             _state.value = _state.value.copy(
                 modelSnapshot = modelManager.snapshot(),
-                backendLabel = stringProvider(R.string.status_model_deleted)
+                backendLabel = stringProvider.get(R.string.status_model_deleted)
             )
         }
     }
@@ -267,10 +263,10 @@ class HomeViewModel(
                     .onFailure { error ->
                         _state.value = _state.value.copy(
                             statusMessage = error.localizedMessage
-                                ?: stringProvider(R.string.status_model_prewarm_failed)
+                                ?: stringProvider.get(R.string.status_model_prewarm_failed)
                         )
                     }
-                _state.value = _state.value.copy(backendLabel = "실행 백엔드: ${assistant.backendLabel()}")
+                _state.value = _state.value.copy(backendLabel = stringProvider.get(R.string.backend_label, assistant.backendLabel()))
             }
         }
     }

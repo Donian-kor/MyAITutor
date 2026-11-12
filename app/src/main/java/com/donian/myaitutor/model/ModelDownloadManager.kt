@@ -87,7 +87,7 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
                             ModelDownloadStatus.READY,
                             modelFile.length(),
                             if (total > 0L) total else EXPECTED_MODEL_BYTES,
-                            "AI 모델 설치 완료"
+                            appContext.getString(R.string.dl_msg_ready)
                         )
                     } else {
                         failedSnapshot(appContext.getString(R.string.dl_msg_size_too_small))
