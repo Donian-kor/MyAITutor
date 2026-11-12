@@ -35,7 +35,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Stop
@@ -218,7 +218,7 @@ internal fun HomeScreen(
                                 enabled = inputText.isNotBlank(),
                                 modifier = Modifier.size(48.dp)
                             ) {
-                                Icon(Icons.Default.Send, contentDescription = "질문 보내기")
+                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "질문 보내기")
                             }
                         }
                     }
@@ -229,6 +229,7 @@ internal fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding)
                 .padding(horizontal = 12.dp, vertical = 6.dp),
