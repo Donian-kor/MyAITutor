@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -25,29 +23,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,16 +53,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import com.donian.myaitutor.ui.home.FollowUpChoices
 import com.donian.myaitutor.ui.home.Subjects
 import com.donian.myaitutor.ui.text.AssistantAnswer
 import java.io.File
@@ -271,58 +254,22 @@ internal fun HomeScreen(
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
-                            if (showFollowUpChoices && capturedImage != null && modelReady && !isAnalyzing && statusMessage == null) {
-                                Text(
-                                    "다음에 알고 싶은 내용을 선택하세요",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(0.dp)
-                                ) {
-                                    FollowUpChoices.forEach { choice ->
-                                        AssistChip(
-                                            onClick = {
-                                                val prompt = choice.prompt
-                                                if (prompt == null) {
-                                                    inputFocusRequester.requestFocus()
-                                                    keyboardController?.show()
-                                                } else {
-                                                    onSendChoice(prompt)
-                                                }
-                                            },
-                                            label = { Text(choice.label) },
-                                            enabled = !isAnalyzing
-                                        )
-                                    }
-                                }
-                            }
+                            FollowUpChips(
+                                visible = showFollowUpChoices && capturedImage != null && modelReady && !isAnalyzing && statusMessage == null,
+                                isAnalyzing = isAnalyzing,
+                                inputFocusRequester = inputFocusRequester,
+                                keyboardController = keyboardController,
+                                onSendChoice = onSendChoice
+                            )
                         }
                     }
 
-                    if (statusMessage != null) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFFFFF0E8))
-                                .padding(start = 10.dp, top = 5.dp, bottom = 5.dp, end = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                statusMessage,
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF8A3C16)
-                            )
-                            if (canRetryAnalysis) {
-                                TextButton(onClick = onRetryAnalysis) { Text("다시 시도") }
-                            }
-                            TextButton(onClick = onDismissStatus) { Text("닫기") }
-                        }
-                    }
+                    StatusBanner(
+                        message = statusMessage,
+                        canRetry = canRetryAnalysis,
+                        onRetry = onRetryAnalysis,
+                        onDismiss = onDismissStatus
+                    )
                 }
             }
         }
