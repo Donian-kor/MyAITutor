@@ -11,13 +11,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -31,6 +36,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -51,8 +58,10 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -60,6 +69,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -81,17 +92,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import com.hrm.latex.renderer.LatexAutoWrap
@@ -106,10 +127,32 @@ import com.donian.myaitutor.model.ModelDownloadManager
 import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelDownloadStatus
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.File
 
 private val Subjects = listOf("국어", "영어", "수학", "과학", "사회", "경제", "철학", "정보", "기타")
+private data class FollowUpChoice(val label: String, val prompt: String?)
+
+private val FollowUpChoices = listOf(
+    FollowUpChoice(
+        label = "자세한 풀이",
+        prompt = "방금 촬영한 문제를 핵심 개념과 계산 과정을 포함해 단계별로 자세히 풀이해 주세요."
+    ),
+    FollowUpChoice(
+        label = "답변만",
+        prompt = "방금 촬영한 문제의 최종 정답만 알려 주세요. 풀이 설명은 생략해 주세요."
+    ),
+    FollowUpChoice(
+        label = "간략한 요약",
+        prompt = "방금 설명한 풀이를 핵심만 2~3문장으로 간략하게 요약해 주세요."
+    ),
+    FollowUpChoice(
+        label = "다시 설명",
+        prompt = "방금 풀이를 더 쉬운 표현과 다른 설명 방식으로 다시 설명해 주세요."
+    ),
+    FollowUpChoice(label = "직접 입력", prompt = null)
+)
 
 private sealed interface AnswerSegment {
     data class Text(val value: String) : AnswerSegment
@@ -119,6 +162,65 @@ private sealed interface AnswerSegment {
 private val MathDelimiterPattern = Regex(
     """(?s)\$\$(.+?)\$\$|\\\[(.+?)\\\]|\\\((.+?)\\\)|(?<!\\)\$(?!\$)(.+?)(?<!\\)\$(?!\$)"""
 )
+
+/**
+ * 모델이 출력한 Markdown을 화면 서식으로 변환합니다.
+ * 지원: **굵게**, 제목(#), 목록(-, *, +). 지원하지 않는 기호는 그대로 둡니다.
+ */
+private val MarkdownHeadingPattern = Regex("""^[ \t]*#{1,6}[ \t]+""")
+private val MarkdownBulletPattern = Regex("""^[ \t]*[-*+][ \t]+""")
+
+private fun AnnotatedString.Builder.appendMarkdown(text: String) {
+    var lineStart = 0
+    while (true) {
+        val lineEnd = text.indexOf('\n', lineStart).let { if (it < 0) text.length else it }
+        appendMarkdownLine(text.substring(lineStart, lineEnd))
+        if (lineEnd == text.length) return
+        append('\n')
+        lineStart = lineEnd + 1
+    }
+}
+
+private fun AnnotatedString.Builder.appendMarkdownLine(line: String) {
+    val heading = MarkdownHeadingPattern.find(line)
+    if (heading != null) {
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+            appendInlineMarkdown(line.substring(heading.range.last + 1))
+        }
+        return
+    }
+    val bullet = MarkdownBulletPattern.find(line)
+    if (bullet != null) {
+        append("• ")
+        appendInlineMarkdown(line.substring(bullet.range.last + 1))
+        return
+    }
+    appendInlineMarkdown(line)
+}
+
+private fun AnnotatedString.Builder.appendInlineMarkdown(text: String) {
+    var cursor = 0
+    while (cursor < text.length) {
+        val open = text.indexOf("**", cursor)
+        if (open < 0) {
+            append(text.substring(cursor))
+            return
+        }
+        append(text.substring(cursor, open))
+        val close = text.indexOf("**", open + 2)
+        if (close < 0) {
+            // 스트리밍 중 닫는 기호가 아직 오지 않은 경우: 기호는 숨기고 굵게 이어 씁니다.
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                append(text.substring(open + 2))
+            }
+            return
+        }
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+            append(text.substring(open + 2, close))
+        }
+        cursor = close + 2
+    }
+}
 
 private fun parseAnswerSegments(answer: String): List<AnswerSegment> = buildList {
     var cursor = 0
@@ -140,7 +242,7 @@ private fun parseAnswerSegments(answer: String): List<AnswerSegment> = buildList
 
 @Composable
 private fun AssistantAnswer(text: String, modifier: Modifier = Modifier) {
-    val textStyle = MaterialTheme.typography.bodyLarge
+    val textStyle = MaterialTheme.typography.bodyLarge.copy(lineHeight = 34.sp)
     val mathConfig = LatexConfig(
         fontSize = textStyle.fontSize,
         theme = LatexTheme.material3()
@@ -150,8 +252,8 @@ private fun AssistantAnswer(text: String, modifier: Modifier = Modifier) {
     val segments = remember(text) { parseAnswerSegments(text) }
 
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         var index = 0
         while (index < segments.size) {
@@ -161,7 +263,7 @@ private fun AssistantAnswer(text: String, modifier: Modifier = Modifier) {
                     latex = segment.latex,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = 6.dp),
                     config = mathConfig,
                     isDarkTheme = isDarkTheme
                 )
@@ -171,7 +273,7 @@ private fun AssistantAnswer(text: String, modifier: Modifier = Modifier) {
                 val annotatedText = buildAnnotatedString {
                     while (index < segments.size) {
                         when (val current = segments[index]) {
-                            is AnswerSegment.Text -> append(current.value)
+                            is AnswerSegment.Text -> appendMarkdown(current.value)
                             is AnswerSegment.Formula -> {
                                 if (current.display) return@buildAnnotatedString
                                 val id = "formula_$index"
@@ -221,13 +323,17 @@ fun FocusAiApp() {
     var captureAction by remember { mutableStateOf<CaptureImageAction?>(null) }
     var modelSnapshot by remember { mutableStateOf(modelManager.snapshot()) }
     var answer by remember { mutableStateOf("") }
-    var followUp by remember { mutableStateOf("") }
+    var inputText by remember { mutableStateOf("") }
+    var showFollowUpChoices by remember { mutableStateOf(false) }
     var isAnalyzing by remember { mutableStateOf(false) }
+    var generationJob by remember { mutableStateOf<Job?>(null) }
+    var generationId by remember { mutableStateOf(0) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var cameraError by remember { mutableStateOf<String?>(null) }
     var backendLabel by remember { mutableStateOf("아직 모델이 실행되지 않았습니다.") }
     var capturedImage by remember { mutableStateOf<File?>(null) }
     var cameraCapturedImage by remember { mutableStateOf<File?>(null) }
+    val focusManager = LocalFocusManager.current
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -253,23 +359,105 @@ fun FocusAiApp() {
     }
 
     fun analyzeImage(image: File, subject: String) {
+        if (isAnalyzing) return
+        val currentGeneration = ++generationId
         isAnalyzing = true
         answer = "촬영한 문제를 분석하고 있습니다."
+        showFollowUpChoices = false
         statusMessage = null
-        scope.launch {
+        generationJob = scope.launch {
+            var completed = false
+            var receivedAnswer = false
             try {
                 assistant.analyzeImage(image, subject) { newText ->
-                    answer = newText
+                    if (currentGeneration == generationId) {
+                        answer = newText
+                        receivedAnswer = newText.isNotBlank()
+                    }
                 }
-                backendLabel = "실행 백엔드: ${assistant.backendLabel()}"
+                if (currentGeneration == generationId) {
+                    backendLabel = "실행 백엔드: ${assistant.backendLabel()}"
+                    completed = true
+                    if (!receivedAnswer) {
+                        answer = "AI 답변을 받지 못했습니다. 다시 촬영해 분석을 시도해 주세요."
+                        statusMessage = "문제 분석 결과가 비어 있어 선택지를 표시하지 않았습니다."
+                    }
+                }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                statusMessage = error.localizedMessage ?: "AI 분석 중 오류가 발생했습니다."
+                if (currentGeneration == generationId) {
+                    statusMessage = error.localizedMessage ?: "AI 분석 중 오류가 발생했습니다."
+                }
             } finally {
-                isAnalyzing = false
+                if (currentGeneration == generationId) {
+                    isAnalyzing = false
+                    showFollowUpChoices = completed && receivedAnswer
+                    generationJob = null
+                }
             }
         }
+    }
+
+    fun sendQuestion(question: String, showChoicesAfterResponse: Boolean = false) {
+        if (question.isBlank() || isAnalyzing) return
+        if (modelSnapshot.status != ModelDownloadStatus.READY) {
+            statusMessage = "AI 모델을 먼저 설치해 주세요."
+            return
+        }
+
+        val currentGeneration = ++generationId
+        val previousAnswer = answer
+        val pendingAnswer = if (previousAnswer.isBlank()) {
+            "학생: $question\n\nAI 답변: "
+        } else {
+            "$previousAnswer\n\n학생: $question\n\nAI 답변: "
+        }
+        isAnalyzing = true
+        showFollowUpChoices = false
+        answer = pendingAnswer
+        inputText = ""
+        statusMessage = null
+        focusManager.clearFocus()
+        generationJob = scope.launch {
+            var completed = false
+            try {
+                assistant.askFollowUp(question) { newText ->
+                    if (currentGeneration == generationId) answer = pendingAnswer + newText
+                }
+                completed = true
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (currentGeneration == generationId) {
+                    statusMessage = error.localizedMessage ?: "질문 처리 중 오류가 발생했습니다."
+                }
+            } finally {
+                if (currentGeneration == generationId) {
+                    isAnalyzing = false
+                    showFollowUpChoices = completed && showChoicesAfterResponse
+                    generationJob = null
+                }
+            }
+        }
+    }
+
+    fun cancelGeneration() {
+        // 네이티브 취소 플래그를 먼저 세팅한 뒤 코루틴을 취소해야
+        // 런타임 스레드의 생성 루프가 즉시 멈춥니다.
+        assistant.cancelGeneration()
+        generationJob?.cancel()
+        generationJob = null
+        // 늦게 도착하는 마지막 토큰이 중단 표시를 덮어쓰지 않도록 세대를 무효화합니다.
+        generationId++
+        isAnalyzing = false
+        answer = when {
+            answer.endsWith("AI 답변: ") ->
+                answer.removeSuffix("AI 답변: ").trimEnd() + "\n\n(답변이 중단되었습니다.)"
+            answer.isBlank() || answer == "촬영한 문제를 분석하고 있습니다." -> ""
+            else -> answer.trimEnd() + "\n\n(답변이 중단되었습니다.)"
+        }
+        statusMessage = "AI 답변을 중단했습니다."
     }
 
     BackHandler(enabled = showCamera) {
@@ -356,46 +544,36 @@ fun FocusAiApp() {
     } else {
         HomeScreen(
             selectedSubject = selectedSubject,
-            onSubjectSelected = { selectedSubject = it },
+            onSubjectSelected = {
+                if (selectedSubject != it) {
+                    selectedSubject = it
+                    capturedImage = null
+                    answer = ""
+                    inputText = ""
+                    showFollowUpChoices = false
+                    statusMessage = null
+                }
+            },
             capturedImage = capturedImage,
             modelReady = modelSnapshot.status == ModelDownloadStatus.READY,
             onOpenSettings = { showSettings = true },
             onOpenCamera = ::openCamera,
             answer = answer,
-            followUp = followUp,
-            onFollowUpChange = { followUp = it },
+            inputText = inputText,
+            onInputChange = { inputText = it },
             isAnalyzing = isAnalyzing,
             statusMessage = statusMessage,
             onDismissStatus = { statusMessage = null },
-            onSendFollowUp = {
-                val question = followUp.trim()
-                if (question.isNotEmpty() && !isAnalyzing) {
-                    if (modelSnapshot.status != ModelDownloadStatus.READY) {
-                        statusMessage = "AI 모델을 먼저 설치해 주세요."
-                    } else {
-                        isAnalyzing = true
-                        val previousAnswer = answer
-                        answer = "$previousAnswer\n\n학생: $question\n\nAI 답변: "
-                        followUp = ""
-                        scope.launch {
-                            try {
-                                assistant.askFollowUp(question) { newText ->
-                                    answer = "$previousAnswer\n\n학생: $question\n\nAI 답변: $newText"
-                                }
-                            } catch (error: Throwable) {
-                                statusMessage = error.localizedMessage ?: "추가 질문 처리 중 오류가 발생했습니다."
-                            } finally {
-                                isAnalyzing = false
-                            }
-                        }
-                    }
-                }
-            }
+            onSend = { sendQuestion(inputText) },
+            onSendChoice = { sendQuestion(it, showChoicesAfterResponse = true) },
+            showFollowUpChoices = showFollowUpChoices,
+            onCancelGeneration = ::cancelGeneration
         )
     }
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun HomeScreen(
     selectedSubject: String,
     onSubjectSelected: (String) -> Unit,
@@ -404,14 +582,19 @@ private fun HomeScreen(
     onOpenSettings: () -> Unit,
     onOpenCamera: () -> Unit,
     answer: String,
-    followUp: String,
-    onFollowUpChange: (String) -> Unit,
+    inputText: String,
+    onInputChange: (String) -> Unit,
     isAnalyzing: Boolean,
     statusMessage: String?,
     onDismissStatus: () -> Unit,
-    onSendFollowUp: () -> Unit
+    onSend: () -> Unit,
+    onSendChoice: (String) -> Unit,
+    showFollowUpChoices: Boolean,
+    onCancelGeneration: () -> Unit
 ) {
     var subjectMenuExpanded by remember { mutableStateOf(false) }
+    val inputFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -421,19 +604,118 @@ private fun HomeScreen(
                 color = MaterialTheme.colorScheme.background,
                 tonalElevation = 3.dp
             ) {
-                Button(
-                    onClick = onOpenCamera,
-                    enabled = !isAnalyzing,
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(16.dp)
+                        .imePadding()
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    Icon(Icons.Default.CameraAlt, contentDescription = null)
-                    Spacer(Modifier.width(9.dp))
-                    Text("문제 촬영", fontWeight = FontWeight.Bold)
+                    val compact = maxWidth < 360.dp
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onOpenCamera,
+                            enabled = !isAnalyzing,
+                            modifier = if (compact) Modifier.size(48.dp) else Modifier.height(48.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            contentPadding = if (compact) PaddingValues(0.dp) else PaddingValues(horizontal = 12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                                contentColor = MaterialTheme.colorScheme.primary,
+                                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.04f),
+                                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            ),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.PhotoCamera,
+                                contentDescription = if (compact) "문제 촬영" else null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            if (!compact) {
+                                Spacer(Modifier.width(6.dp))
+                                Text("촬영")
+                            }
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp, max = 88.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp, max = 88.dp)
+                                    .padding(horizontal = 14.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                BasicTextField(
+                                    value = inputText,
+                                    onValueChange = onInputChange,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 24.dp, max = 64.dp)
+                                        .focusRequester(inputFocusRequester),
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                    maxLines = 3,
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                                    keyboardActions = KeyboardActions(
+                                        onSend = { if (inputText.isNotBlank() && !isAnalyzing) onSend() }
+                                    ),
+                                    decorationBox = { innerTextField ->
+                                        Box {
+                                            if (inputText.isEmpty()) {
+                                                Text(
+                                                    if (answer.isBlank()) "질문 입력" else "추가 질문 입력",
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                            innerTextField()
+                                        }
+                                    }
+                                )
+                            }
+                        }
+
+                        if (isAnalyzing) {
+                            FilledTonalButton(
+                                onClick = onCancelGeneration,
+                                modifier = Modifier.size(48.dp),
+                                shape = RoundedCornerShape(24.dp),
+                                contentPadding = PaddingValues(0.dp),
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            ) {
+                                Icon(Icons.Default.Stop, contentDescription = "답변 중단")
+                            }
+                        } else {
+                            FilledIconButton(
+                                onClick = onSend,
+                                enabled = inputText.isNotBlank(),
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(Icons.Default.Send, contentDescription = "질문 보내기")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -507,7 +789,7 @@ private fun HomeScreen(
                         Icon(Icons.Default.SmartToy, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            if (isAnalyzing) "문제 분석 중" else "AI 생성기",
+                            if (isAnalyzing) "답변 생성 중" else "AI 생성기",
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f)
                         )
@@ -538,7 +820,7 @@ private fun HomeScreen(
                             )
                             Text(
                                 if (modelReady) {
-                                    "화면 아래의 문제 촬영 버튼을 눌러 시작하세요."
+                                    "문제를 촬영하면 짧은 답변 후 원하는 설명을 고를 수 있습니다."
                                 } else {
                                     "AI 모델을 설치하면 촬영한 문제를 풀이할 수 있습니다."
                                 },
@@ -555,13 +837,46 @@ private fun HomeScreen(
                             }
                         }
                     } else {
-                        SelectionContainer {
-                            AssistantAnswer(
-                                text = answer,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth()
-                            )
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            SelectionContainer {
+                                AssistantAnswer(
+                                    text = answer,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            if (showFollowUpChoices && capturedImage != null && modelReady && !isAnalyzing && statusMessage == null) {
+                                Text(
+                                    "다음에 알고 싶은 내용을 선택하세요",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                                ) {
+                                    FollowUpChoices.forEach { choice ->
+                                        AssistChip(
+                                            onClick = {
+                                                val prompt = choice.prompt
+                                                if (prompt == null) {
+                                                    inputFocusRequester.requestFocus()
+                                                    keyboardController?.show()
+                                                } else {
+                                                    onSendChoice(prompt)
+                                                }
+                                            },
+                                            label = { Text(choice.label) },
+                                            enabled = !isAnalyzing
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -582,46 +897,6 @@ private fun HomeScreen(
                                 color = Color(0xFF8A3C16)
                             )
                             TextButton(onClick = onDismissStatus) { Text("닫기") }
-                        }
-                    }
-
-                    if (answer.isNotBlank()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 6.dp)
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .padding(start = 12.dp, end = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            BasicTextField(
-                                value = followUp,
-                                onValueChange = onFollowUpChange,
-                                modifier = Modifier.weight(1f).padding(vertical = 12.dp),
-                                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.onSurface
-                                ),
-                                singleLine = true,
-                                decorationBox = { innerTextField ->
-                                    Box {
-                                        if (followUp.isEmpty()) {
-                                            Text(
-                                                "답변에 추가 질문하기",
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-                                        }
-                                        innerTextField()
-                                    }
-                                }
-                            )
-                            IconButton(
-                                onClick = onSendFollowUp,
-                                enabled = followUp.isNotBlank() && !isAnalyzing
-                            ) {
-                                Icon(Icons.Default.Send, contentDescription = "질문 전송", tint = MaterialTheme.colorScheme.primary)
-                            }
                         }
                     }
                 }
