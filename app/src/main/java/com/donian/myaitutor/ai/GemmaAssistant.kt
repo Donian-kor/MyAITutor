@@ -31,6 +31,9 @@ class GemmaAssistant(context: Context) : Assistant {
 
     companion object {
         private const val TAG = "GemmaAssistant"
+
+        /** 대화가 이 토큰 수를 넘으면 문맥을 초기화합니다. (N-12) */
+        private const val MAX_CONVERSATION_TOKENS = 8_000
     }
 
     private val runtimeDispatcher = Executors.newSingleThreadExecutor { runnable ->
@@ -81,6 +84,7 @@ class GemmaAssistant(context: Context) : Assistant {
     ) = withContext(runtimeDispatcher) {
         require(question.isNotBlank()) { "질문 내용을 입력해 주세요." }
         ensureInitializedOnRuntimeThread()
+        resetIfContextTooLong()
         val followUpPrompt = followUpPrompt(question)
         streamResponse(
             conversation = requireNotNull(conversation),
@@ -124,6 +128,17 @@ class GemmaAssistant(context: Context) : Assistant {
                 )
             }
         }
+    }
+
+    /**
+     * 대화 토큰 수가 상한을 넘으면 문맥을 비워 재답변 오류를 방지합니다. (N-12)
+     */
+    private suspend fun resetIfContextTooLong() {
+        val current = conversation ?: return
+        val tokens = runCatching { current.getTokenCount() }.getOrElse { return }
+        if (tokens < MAX_CONVERSATION_TOKENS) return
+        Log.i(TAG, "대화 토큰 수($tokens)가 상한($MAX_CONVERSATION_TOKENS)을 넘어 문맥을 초기화합니다.")
+        resetConversation()
     }
 
     private suspend fun ensureInitializedOnRuntimeThread() {
