@@ -1,6 +1,7 @@
 package com.donian.myaitutor.ui.camera
 
 import android.app.Activity
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.exifinterface.media.ExifInterface
@@ -30,10 +31,12 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -44,6 +47,8 @@ import androidx.core.view.WindowCompat
 import com.donian.myaitutor.camera.CameraPreview
 import com.donian.myaitutor.camera.CaptureImageAction
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun CameraScreen(
@@ -59,28 +64,16 @@ internal fun CameraScreen(
 ) {
     val view = LocalView.current
     val activity = view.context as? Activity
-    val capturedBitmap = remember(capturedImage) {
-        capturedImage?.let { android.graphics.BitmapFactory.decodeFile(it.absolutePath)?.asImageBitmap() }
-    }
-    val capturedImageTransform = remember(capturedImage) {
-        val orientation = capturedImage?.let {
-            ExifInterface(it.absolutePath).getAttributeInt(
-                ExifInterface.TAG_ORIENTATION,
-                ExifInterface.ORIENTATION_NORMAL
-            )
-        } ?: ExifInterface.ORIENTATION_NORMAL
-
-        when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> 90f to 1f
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180f to 1f
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270f to 1f
-            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> 0f to -1f
-            ExifInterface.ORIENTATION_FLIP_VERTICAL -> 180f to -1f
-            ExifInterface.ORIENTATION_TRANSPOSE -> 90f to -1f
-            ExifInterface.ORIENTATION_TRANSVERSE -> 270f to -1f
-            else -> 0f to 1f
+    // 미리보기 디코딩은 메인 스레드에서 하지 않는다. (R-04)
+    val capturedPreview by produceState<CapturedPreview?>(initialValue = null, capturedImage) {
+        val file = capturedImage
+        value = if (file == null) {
+            null
+        } else {
+            withContext(Dispatchers.IO) { decodePreview(file) }
         }
     }
+    val preview = capturedPreview
 
     DisposableEffect(activity, view) {
         val controller = activity?.window?.let { WindowCompat.getInsetsController(it, view) }
@@ -110,15 +103,15 @@ internal fun CameraScreen(
                 onCaptureReady = onCaptureActionReady,
                 onCameraError = onCameraError
             )
-        } else if (capturedBitmap != null) {
+        } else if (preview != null) {
             Image(
-                bitmap = capturedBitmap,
+                bitmap = preview.bitmap,
                 contentDescription = "촬영한 문제 미리보기",
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        rotationZ = capturedImageTransform.first
-                        scaleX = capturedImageTransform.second
+                        rotationZ = preview.rotation
+                        scaleX = preview.scaleX
                     },
                 contentScale = ContentScale.Fit
             )
@@ -203,4 +196,46 @@ internal fun CameraScreen(
             }
         }
     }
+}
+
+/** 촬영 미리보기용 디코딩 결과. */
+private data class CapturedPreview(
+    val bitmap: ImageBitmap,
+    val rotation: Float,
+    val scaleX: Float
+)
+
+/** 미리보기 최대 장변(px). 원본 해상도 그대로 로드하지 않아 OOM을 막는다. */
+private const val PREVIEW_MAX_SIDE_PX = 1600
+
+/**
+ * 촬영 이미지를 미리보기 크기로 디코딩합니다. 반드시 IO 스레드에서 호출할 것. (R-04)
+ */
+private fun decodePreview(file: File): CapturedPreview? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= PREVIEW_MAX_SIDE_PX) {
+        sample *= 2
+    }
+    val options = BitmapFactory.Options().apply { inSampleSize = sample }
+    val bitmap = BitmapFactory.decodeFile(file.absolutePath, options) ?: return null
+
+    val orientation = ExifInterface(file.absolutePath).getAttributeInt(
+        ExifInterface.TAG_ORIENTATION,
+        ExifInterface.ORIENTATION_NORMAL
+    )
+    val (rotation, scaleX) = when (orientation) {
+        ExifInterface.ORIENTATION_ROTATE_90 -> 90f to 1f
+        ExifInterface.ORIENTATION_ROTATE_180 -> 180f to 1f
+        ExifInterface.ORIENTATION_ROTATE_270 -> 270f to 1f
+        ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> 0f to -1f
+        ExifInterface.ORIENTATION_FLIP_VERTICAL -> 180f to -1f
+        ExifInterface.ORIENTATION_TRANSPOSE -> 90f to -1f
+        ExifInterface.ORIENTATION_TRANSVERSE -> 270f to -1f
+        else -> 0f to 1f
+    }
+    return CapturedPreview(bitmap.asImageBitmap(), rotation, scaleX)
 }
