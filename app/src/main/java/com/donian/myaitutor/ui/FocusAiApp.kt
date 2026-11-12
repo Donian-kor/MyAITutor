@@ -163,8 +163,17 @@ private fun File.deleteQuietly() {
 @Composable
 fun FocusAiApp() {
     val context = LocalContext.current
-    val viewModel: HomeViewModel = viewModel()
+    val scope = rememberCoroutineScope()
+    val viewModel: HomeViewModel = remember(scope) {
+        HomeViewModel(
+            appContext = context.applicationContext,
+            scope = scope
+        )
+    }
     val uiState by viewModel.state.collectAsState()
+    DisposableEffect(viewModel) {
+        onDispose { /* scope is managed by composition */ }
+    }
 
     var showSettings by remember { mutableStateOf(false) }
     var showCamera by remember { mutableStateOf(false) }

@@ -25,7 +25,7 @@ import java.util.concurrent.Executors
  * Owns one LiteRT-LM Engine and one multi-turn Conversation.
  * All native runtime operations are serialized on one dedicated thread.
  */
-class GemmaAssistant(context: Context) {
+class GemmaAssistant(context: Context) : Assistant {
     private val appContext = context.applicationContext
     private val runtimeDispatcher = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "focus-ai-litert-runtime").apply { isDaemon = true }
@@ -37,13 +37,13 @@ class GemmaAssistant(context: Context) {
     private var selectedBackendLabel: String = "미실행"
     private val generationMutex = Mutex()
 
-    suspend fun preWarm() {
+    override suspend fun preWarm() {
         withContext(runtimeDispatcher) {
             runCatching { ensureInitializedOnRuntimeThread() }
         }
     }
 
-    suspend fun analyzeImage(
+    override suspend fun analyzeImage(
         imageFile: File,
         subject: String,
         onTextChanged: suspend (String) -> Unit
@@ -64,7 +64,7 @@ class GemmaAssistant(context: Context) {
         )
     }
 
-    suspend fun askFollowUp(
+    override suspend fun askFollowUp(
         question: String,
         onTextChanged: suspend (String) -> Unit
     ) = withContext(runtimeDispatcher) {
@@ -78,14 +78,14 @@ class GemmaAssistant(context: Context) {
         )
     }
 
-    suspend fun backendLabel(): String = withContext(runtimeDispatcher) { selectedBackendLabel }
+    override suspend fun backendLabel(): String = withContext(runtimeDispatcher) { selectedBackendLabel }
 
     /**
      * 진행 중인 답변 생성을 중단합니다.
      * 런타임 스레드는 생성 중이라 대기할 수 없으므로, 네이티브 취소 플래그만
      * 즉시 세팅하고 반환합니다. 메인 스레드에서 호출해도 안전합니다.
      */
-    fun cancelGeneration() {
+    override fun cancelGeneration() {
         runCatching { conversation?.cancelProcess() }
     }
 
@@ -198,7 +198,7 @@ class GemmaAssistant(context: Context) {
         }
     }
 
-    suspend fun release() = withContext(runtimeDispatcher) {
+    override suspend fun release() = withContext(runtimeDispatcher) {
         generationMutex.withLock {
             runCatching { conversation?.close() }
             conversation = null

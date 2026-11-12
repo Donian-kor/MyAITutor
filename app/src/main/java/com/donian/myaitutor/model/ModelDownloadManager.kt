@@ -13,12 +13,12 @@ import kotlinx.coroutines.withContext
  * Gemma 4 E4B-IT LiteRT-LM model downloader.
  * The model is kept outside the APK in the app-specific downloads directory.
  */
-class ModelDownloadManager(context: Context) {
+class ModelDownloadManager(context: Context) : ModelDownloadRepository {
     private val appContext = context.applicationContext
     private val downloadManager = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
     private val preferences = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    val modelFile: File
+    override val modelFile: File
         get() {
             val directory = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
                 ?: File(appContext.filesDir, "downloads")
@@ -26,7 +26,7 @@ class ModelDownloadManager(context: Context) {
             return File(directory, MODEL_FILE_NAME)
         }
 
-    fun snapshot(): ModelDownloadSnapshot {
+    override fun snapshot(): ModelDownloadSnapshot {
         val downloadId = preferences.getLong(KEY_DOWNLOAD_ID, -1L)
         val completedPreviously = preferences.getBoolean(KEY_COMPLETED, false)
 
@@ -99,7 +99,7 @@ class ModelDownloadManager(context: Context) {
         }
     }
 
-    fun startDownload(): Long {
+    override fun startDownload(): Long {
         val storageDirectory = modelFile.parentFile ?: appContext.filesDir
         val availableBytes = StatFs(storageDirectory.absolutePath).availableBytes
         val requiredBytes = EXPECTED_MODEL_BYTES + 600_000_000L
@@ -132,7 +132,7 @@ class ModelDownloadManager(context: Context) {
         return id
     }
 
-    fun deleteModel() {
+    override fun deleteModel() {
         val id = preferences.getLong(KEY_DOWNLOAD_ID, -1L)
         if (id >= 0L) runCatching { downloadManager.remove(id) }
         modelFile.delete()
@@ -144,12 +144,12 @@ class ModelDownloadManager(context: Context) {
             .apply()
     }
 
-    fun isModelReady(): Boolean = snapshot().status == ModelDownloadStatus.READY
+    override fun isModelReady(): Boolean = snapshot().status == ModelDownloadStatus.READY
 
     /**
      * 해시 검증이 필요한지 여부. EXPECTED_MODEL_SHA256이 비어 있으면 검증을 건너뜁니다.
      */
-    fun needsHashVerification(): Boolean {
+    override fun needsHashVerification(): Boolean {
         if (EXPECTED_MODEL_SHA256.isEmpty()) return false
         if (!modelFile.isFile || modelFile.length() < MIN_MODEL_BYTES) return false
         if (preferences.getBoolean(KEY_HASH_VERIFIED, false)) return false
@@ -161,7 +161,7 @@ class ModelDownloadManager(context: Context) {
      * 모델 파일의 SHA-256을 계산해 기대값과 비교합니다.
      * IO 스레드에서 호출해야 합니다. 결과는 SharedPreferences에 캐시됩니다.
      */
-    suspend fun verifyModelHash(): Boolean = withContext(kotlinx.coroutines.Dispatchers.IO) {
+    override suspend fun verifyModelHash(): Boolean = withContext(kotlinx.coroutines.Dispatchers.IO) {
         if (EXPECTED_MODEL_SHA256.isEmpty()) return@withContext true
         if (!modelFile.isFile) return@withContext false
         try {

@@ -1,13 +1,13 @@
 package com.donian.myaitutor.ui.home
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
+import android.content.Context
+import com.donian.myaitutor.ai.Assistant
 import com.donian.myaitutor.ai.GemmaAssistant
 import com.donian.myaitutor.model.ModelDownloadManager
+import com.donian.myaitutor.model.ModelDownloadRepository
 import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelDownloadStatus
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -19,12 +19,18 @@ import java.io.File
 /**
  * 홈 화면의 상태와 비즈니스 로직을 소유합니다.
  * Composable은 상태를 구독하고 이벤트를 위임하기만 합니다.
+ *
+ * [scope]는 외부에서 주입합니다. 프로덕션에서는 Composable의
+ * rememberCoroutineScope()를, 테스트에서는 TestScope를 전달합니다.
  */
-class HomeViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val appContext = application.applicationContext
-    private val modelManager = ModelDownloadManager(appContext)
-    private val assistant = GemmaAssistant(appContext)
+class HomeViewModel(
+    private val appContext: Context,
+    private val modelManager: ModelDownloadRepository = ModelDownloadManager(appContext),
+    private val assistant: Assistant = GemmaAssistant(appContext),
+    private val scope: CoroutineScope,
+    private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
+    private val enablePolling: Boolean = true
+) {
 
     private val _state = kotlinx.coroutines.flow.MutableStateFlow(
         HomeUiState(modelSnapshot = modelManager.snapshot())
@@ -35,32 +41,27 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private var generationId = 0
 
     init {
-        // 다운로드 상태를 주기적으로 갱신합니다. (C-01)
-        viewModelScope.launch {
-            while (isActive) {
-                val snapshot = withContext(Dispatchers.IO) {
-                    if (modelManager.needsHashVerification()) {
-                        modelManager.verifyModelHash()
+        if (enablePolling) {
+            scope.launch {
+                while (isActive) {
+                    val snapshot = withContext(ioDispatcher) {
+                        if (modelManager.needsHashVerification()) {
+                            modelManager.verifyModelHash()
+                        }
+                        modelManager.snapshot()
                     }
-                    modelManager.snapshot()
+                    _state.value = _state.value.copy(modelSnapshot = snapshot)
+                    val busy = snapshot.status == ModelDownloadStatus.DOWNLOADING ||
+                        snapshot.status == ModelDownloadStatus.QUEUED ||
+                        snapshot.status == ModelDownloadStatus.PAUSED
+                    delay(if (busy) 1_000L else 5_000L)
                 }
-                _state.value = _state.value.copy(modelSnapshot = snapshot)
-                val busy = snapshot.status == ModelDownloadStatus.DOWNLOADING ||
-                    snapshot.status == ModelDownloadStatus.QUEUED ||
-                    snapshot.status == ModelDownloadStatus.PAUSED
-                delay(if (busy) 1_000L else 5_000L)
             }
         }
     }
 
-    fun resetForNewSubject() {
-        _state.value = _state.value.copy(
-            capturedImage = null,
-            answer = "",
-            inputText = "",
-            showFollowUpChoices = false,
-            statusMessage = null
-        )
+    fun close() {
+        // scope.cancel()은 호출자(scope 소유자)가 관리합니다.
     }
 
     fun onInputChange(text: String) {
@@ -73,6 +74,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setStatusMessage(message: String?) {
         _state.value = _state.value.copy(statusMessage = message)
+    }
+
+    fun resetForNewSubject() {
+        _state.value = _state.value.copy(
+            capturedImage = null,
+            answer = "",
+            inputText = "",
+            showFollowUpChoices = false,
+            statusMessage = null
+        )
     }
 
     fun confirmCapture(image: File) {
@@ -104,10 +115,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             showFollowUpChoices = false,
             statusMessage = null
         )
-        generationJob = viewModelScope.launch {
+        generationJob = scope.launch {
             var completed = false
             var receivedAnswer = false
-            val imageToAnalyze = withContext(Dispatchers.IO) {
+            val imageToAnalyze = withContext(ioDispatcher) {
                 com.donian.myaitutor.camera.ImageNormalizer.normalize(image) ?: image
             }
             try {
@@ -128,7 +139,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                 }
-            } catch (error: CancellationException) {
+            } catch (error: kotlinx.coroutines.CancellationException) {
                 throw error
             } catch (error: Exception) {
                 if (currentGeneration == generationId) {
@@ -172,7 +183,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             inputText = "",
             statusMessage = null
         )
-        generationJob = viewModelScope.launch {
+        generationJob = scope.launch {
             var completed = false
             var receivedAnswer = false
             try {
@@ -192,7 +203,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                 }
-            } catch (error: CancellationException) {
+            } catch (error: kotlinx.coroutines.CancellationException) {
                 throw error
             } catch (error: Exception) {
                 if (currentGeneration == generationId) {
@@ -218,7 +229,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startDownload() {
-        viewModelScope.launch {
+        scope.launch {
             runCatching { modelManager.startDownload() }
                 .onSuccess {
                     _state.value = _state.value.copy(statusMessage = "Wi-Fi에서 AI 모델 다운로드가 시작됩니다.")
@@ -233,7 +244,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteModel() {
-        viewModelScope.launch {
+        scope.launch {
             assistant.release()
             modelManager.deleteModel()
             _state.value = _state.value.copy(
@@ -244,17 +255,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun preWarmIfNeeded() {
-        viewModelScope.launch {
+        scope.launch {
             if (_state.value.modelSnapshot.status == ModelDownloadStatus.READY) {
                 runCatching { assistant.preWarm() }
                 _state.value = _state.value.copy(backendLabel = "실행 백엔드: ${assistant.backendLabel()}")
             }
         }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        generationJob?.cancel()
-        viewModelScope.launch { runCatching { assistant.release() } }
     }
 }
