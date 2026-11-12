@@ -49,6 +49,7 @@ class GemmaAssistant(context: Context) {
         onTextChanged: suspend (String) -> Unit
     ) = withContext(runtimeDispatcher) {
         require(imageFile.exists() && imageFile.length() > 0L) { "촬영된 이미지가 없습니다." }
+        resetConversation()
         ensureInitializedOnRuntimeThread()
 
         val prompt = analyzeImagePrompt(subject)
@@ -86,6 +87,32 @@ class GemmaAssistant(context: Context) {
      */
     fun cancelGeneration() {
         runCatching { conversation?.cancelProcess() }
+    }
+
+    /**
+     * 새 문제를 풀기 전에 이전 대화 문맥을 초기화합니다.
+     * 엔진은 유지하고 대화만 새로 생성합니다. (R-02)
+     */
+    suspend fun resetConversation() = withContext(runtimeDispatcher) {
+        generationMutex.withLock {
+            runCatching { conversation?.cancelProcess() }
+            runCatching { conversation?.close() }
+            conversation = null
+            val currentEngine = engine
+            if (currentEngine != null) {
+                conversation = currentEngine.createConversation(
+                    ConversationConfig(
+                        systemInstruction = Contents.of(SystemInstruction),
+                        samplerConfig = SamplerConfig(
+                            topK = 20,
+                            topP = 0.9,
+                            temperature = 0.35
+                        ),
+                        maxOutputToken = 2048
+                    )
+                )
+            }
+        }
     }
 
     private suspend fun ensureInitializedOnRuntimeThread() {
