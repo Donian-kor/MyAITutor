@@ -19,14 +19,13 @@ import com.donian.myaitutor.camera.CaptureImageAction
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.donian.myaitutor.model.ModelDownloadStatus
-import com.donian.myaitutor.ui.camera.CameraScreen
+import com.donian.myaitutor.ui.camera.CameraRoute
 import com.donian.myaitutor.ui.home.HomeScreen
 import com.donian.myaitutor.ui.home.HomeViewModel
 import com.donian.myaitutor.ui.settings.SettingsScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import com.donian.myaitutor.ui.home.deleteQuietly
 import com.donian.myaitutor.ui.home.deleteStaleCaptures
 
@@ -101,47 +100,12 @@ fun FocusAiApp() {
             onDeleteModel = { viewModel.deleteModel() }
         )
     } else if (showCamera) {
-        CameraScreen(
-            capturedImage = uiState.cameraCapturedImage,
+        CameraRoute(
+            viewModel = viewModel,
             captureAction = captureAction,
-            cameraError = uiState.cameraError,
             onCaptureActionReady = { captureAction = it },
-            onCameraError = { viewModel.onCameraError(it) },
-            onBack = {
-                showCamera = false
-                uiState.cameraCapturedImage?.deleteQuietly()
-                viewModel.clearCameraCapturedImage()
-            },
-            onCapture = {
-                val action = captureAction
-                if (action == null) {
-                    viewModel.onCameraError("카메라가 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.")
-                } else {
-                    val imageFile = File(context.cacheDir, "focus_capture_${System.currentTimeMillis()}.jpg")
-                    action(imageFile) { result ->
-                        result.onSuccess { viewModel.setCameraCapturedImage(it) }
-                            .onFailure { error ->
-                                viewModel.onCameraError(error.localizedMessage ?: "촬영 이미지를 처리하지 못했습니다.")
-                            }
-                    }
-                }
-            },
-            onRetake = {
-                uiState.cameraCapturedImage?.deleteQuietly()
-                viewModel.clearCameraCapturedImage()
-            },
-            onConfirm = {
-                val image = uiState.cameraCapturedImage
-                if (image != null) {
-                    viewModel.confirmCapture(image)
-                    showCamera = false
-                    if (uiState.modelSnapshot.status == ModelDownloadStatus.READY) {
-                        viewModel.analyzeImage(image, selectedSubject)
-                    } else {
-                        viewModel.setStatusMessage("사진을 확인했습니다. AI 모델을 설치하면 문제 풀이를 시작할 수 있습니다.")
-                    }
-                }
-            }
+            onClose = { showCamera = false },
+            selectedSubject = selectedSubject
         )
     } else {
         HomeScreen(
