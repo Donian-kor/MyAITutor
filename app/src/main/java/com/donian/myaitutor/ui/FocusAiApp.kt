@@ -126,6 +126,11 @@ import com.donian.myaitutor.camera.CaptureImageAction
 import com.donian.myaitutor.model.ModelDownloadManager
 import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelDownloadStatus
+import com.donian.myaitutor.ui.components.InfoCard
+import com.donian.myaitutor.ui.home.FollowUpChoice
+import com.donian.myaitutor.ui.home.FollowUpChoices
+import com.donian.myaitutor.ui.home.Subjects
+import com.donian.myaitutor.ui.text.AssistantAnswer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -133,178 +138,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-private val Subjects = listOf("국어", "영어", "수학", "과학", "사회", "경제", "철학", "정보", "기타")
-private data class FollowUpChoice(val label: String, val prompt: String?)
 
-private val FollowUpChoices = listOf(
-    FollowUpChoice(
-        label = "자세한 풀이",
-        prompt = "방금 촬영한 문제를 핵심 개념과 계산 과정을 포함해 단계별로 자세히 풀이해 주세요."
-    ),
-    FollowUpChoice(
-        label = "답변만",
-        prompt = "방금 촬영한 문제의 최종 정답만 알려 주세요. 풀이 설명은 생략해 주세요."
-    ),
-    FollowUpChoice(
-        label = "간략한 요약",
-        prompt = "방금 설명한 풀이를 핵심만 2~3문장으로 간략하게 요약해 주세요."
-    ),
-    FollowUpChoice(
-        label = "다시 설명",
-        prompt = "방금 풀이를 더 쉬운 표현과 다른 설명 방식으로 다시 설명해 주세요."
-    ),
-    FollowUpChoice(label = "직접 입력", prompt = null)
-)
 
-private sealed interface AnswerSegment {
-    data class Text(val value: String) : AnswerSegment
-    data class Formula(val latex: String, val display: Boolean, val source: String) : AnswerSegment
-}
 
-private val MathDelimiterPattern = Regex(
-    """(?s)\$\$(.+?)\$\$|\\\[(.+?)\\\]|\\\((.+?)\\\)|(?<!\\)\$(?!\$)(.+?)(?<!\\)\$(?!\$)"""
-)
 
-/**
- * 모델이 출력한 Markdown을 화면 서식으로 변환합니다.
- * 지원: **굵게**, 제목(#), 목록(-, *, +). 지원하지 않는 기호는 그대로 둡니다.
- */
-private val MarkdownHeadingPattern = Regex("""^[ \t]*#{1,6}[ \t]+""")
-private val MarkdownBulletPattern = Regex("""^[ \t]*[-*+][ \t]+""")
-
-private fun AnnotatedString.Builder.appendMarkdown(text: String) {
-    var lineStart = 0
-    while (true) {
-        val lineEnd = text.indexOf('\n', lineStart).let { if (it < 0) text.length else it }
-        appendMarkdownLine(text.substring(lineStart, lineEnd))
-        if (lineEnd == text.length) return
-        append('\n')
-        lineStart = lineEnd + 1
-    }
-}
-
-private fun AnnotatedString.Builder.appendMarkdownLine(line: String) {
-    val heading = MarkdownHeadingPattern.find(line)
-    if (heading != null) {
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-            appendInlineMarkdown(line.substring(heading.range.last + 1))
-        }
-        return
-    }
-    val bullet = MarkdownBulletPattern.find(line)
-    if (bullet != null) {
-        append("• ")
-        appendInlineMarkdown(line.substring(bullet.range.last + 1))
-        return
-    }
-    appendInlineMarkdown(line)
-}
-
-private fun AnnotatedString.Builder.appendInlineMarkdown(text: String) {
-    var cursor = 0
-    while (cursor < text.length) {
-        val open = text.indexOf("**", cursor)
-        if (open < 0) {
-            append(text.substring(cursor))
-            return
-        }
-        append(text.substring(cursor, open))
-        val close = text.indexOf("**", open + 2)
-        if (close < 0) {
-            // 스트리밍 중 닫는 기호가 아직 오지 않은 경우: 기호는 숨기고 굵게 이어 씁니다.
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                append(text.substring(open + 2))
-            }
-            return
-        }
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-            append(text.substring(open + 2, close))
-        }
-        cursor = close + 2
-    }
-}
-
-private fun parseAnswerSegments(answer: String): List<AnswerSegment> = buildList {
-    var cursor = 0
-    MathDelimiterPattern.findAll(answer).forEach { match ->
-        if (match.range.first > cursor) {
-            add(AnswerSegment.Text(answer.substring(cursor, match.range.first)))
-        }
-        val displayLatex = match.groups[1]?.value ?: match.groups[2]?.value
-        val inlineLatex = match.groups[3]?.value ?: match.groups[4]?.value
-        if (displayLatex != null) {
-            add(AnswerSegment.Formula(displayLatex.trim(), display = true, source = match.value))
-        } else if (inlineLatex != null) {
-            add(AnswerSegment.Formula(inlineLatex.trim(), display = false, source = match.value))
-        }
-        cursor = match.range.last + 1
-    }
-    if (cursor < answer.length) add(AnswerSegment.Text(answer.substring(cursor)))
-}
-
-@Composable
-private fun AssistantAnswer(text: String, modifier: Modifier = Modifier) {
-    val textStyle = MaterialTheme.typography.bodyLarge.copy(lineHeight = 34.sp)
-    val mathConfig = LatexConfig(
-        fontSize = textStyle.fontSize,
-        theme = LatexTheme.material3()
-    )
-    val measurer = rememberLatexMeasurer(mathConfig)
-    val isDarkTheme = isSystemInDarkTheme()
-    val segments = remember(text) { parseAnswerSegments(text) }
-
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        var index = 0
-        while (index < segments.size) {
-            val segment = segments[index]
-            if (segment is AnswerSegment.Formula && segment.display) {
-                LatexAutoWrap(
-                    latex = segment.latex,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp),
-                    config = mathConfig,
-                    isDarkTheme = isDarkTheme
-                )
-                index++
-            } else {
-                val inlineContent = mutableMapOf<String, InlineTextContent>()
-                val annotatedText = buildAnnotatedString {
-                    while (index < segments.size) {
-                        when (val current = segments[index]) {
-                            is AnswerSegment.Text -> appendMarkdown(current.value)
-                            is AnswerSegment.Formula -> {
-                                if (current.display) return@buildAnnotatedString
-                                val id = "formula_$index"
-                                val rendered = measurer.inlineContent(
-                                    latex = current.latex,
-                                    config = mathConfig,
-                                    isDarkTheme = isDarkTheme
-                                )
-                                if (rendered == null) {
-                                    append(current.source)
-                                } else {
-                                    appendInlineContent(id, current.latex)
-                                    inlineContent[id] = rendered
-                                }
-                            }
-                        }
-                        index++
-                    }
-                }
-                Text(
-                    text = annotatedText,
-                    inlineContent = inlineContent,
-                    style = textStyle,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
-    }
-}
 
 /** 촬영 임시 파일 이름 접두사. cacheDir 정리 대상 식별에 사용합니다. */
 private const val CaptureFilePrefix = "focus_capture_"
@@ -1233,38 +1070,3 @@ private fun SettingsScreen(
     }
 }
 
-@Composable
-private fun InfoCard(
-    icon: @Composable () -> Unit,
-    title: String,
-    body: String
-) {
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.Top) {
-            icon()
-            Spacer(Modifier.width(11.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, fontWeight = FontWeight.SemiBold)
-                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-fun FocusAiTheme(content: @Composable () -> Unit) {
-    val colors = androidx.compose.material3.lightColorScheme(
-        primary = Color(0xFF245B9B),
-        onPrimary = Color.White,
-        secondary = Color(0xFF4D6F91),
-        background = Color(0xFFF4F6FA),
-        surface = Color.White,
-        onSurface = Color(0xFF182232),
-        onSurfaceVariant = Color(0xFF657386),
-        outlineVariant = Color(0xFFDDE3EC)
-    )
-    MaterialTheme(colorScheme = colors, content = content)
-}

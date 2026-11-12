@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.donian.myaitutor.ui.FocusAiApp
-import com.donian.myaitutor.ui.FocusAiTheme
+import com.donian.myaitutor.ui.theme.FocusAiTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
