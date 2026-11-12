@@ -3,6 +3,7 @@ package com.donian.myaitutor.ui.camera
 import android.app.Activity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.exifinterface.media.ExifInterface
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,20 +64,20 @@ internal fun CameraScreen(
     }
     val capturedImageTransform = remember(capturedImage) {
         val orientation = capturedImage?.let {
-            android.media.ExifInterface(it.absolutePath).getAttributeInt(
-                android.media.ExifInterface.TAG_ORIENTATION,
-                android.media.ExifInterface.ORIENTATION_NORMAL
+            ExifInterface(it.absolutePath).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
             )
-        } ?: android.media.ExifInterface.ORIENTATION_NORMAL
+        } ?: ExifInterface.ORIENTATION_NORMAL
 
         when (orientation) {
-            android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f to 1f
-            android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f to 1f
-            android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f to 1f
-            android.media.ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> 0f to -1f
-            android.media.ExifInterface.ORIENTATION_FLIP_VERTICAL -> 180f to -1f
-            android.media.ExifInterface.ORIENTATION_TRANSPOSE -> 90f to -1f
-            android.media.ExifInterface.ORIENTATION_TRANSVERSE -> 270f to -1f
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f to 1f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f to 1f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f to 1f
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> 0f to -1f
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> 180f to -1f
+            ExifInterface.ORIENTATION_TRANSPOSE -> 90f to -1f
+            ExifInterface.ORIENTATION_TRANSVERSE -> 270f to -1f
             else -> 0f to 1f
         }
     }
