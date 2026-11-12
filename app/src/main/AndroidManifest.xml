@@ -12,7 +12,7 @@
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:icon="@drawable/ic_myaitutor"
-        android:label="MyAITutor"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.MyAITutor"
         android:usesCleartextTraffic="false">

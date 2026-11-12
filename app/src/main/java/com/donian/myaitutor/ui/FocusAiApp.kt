@@ -1209,7 +1209,7 @@ private fun SettingsScreen(
                 title = "개인정보 오프라인 처리",
                 body = "문제 촬영과 분석은 모두 기기 안에서 처리되며 외부 서버로 전송되지 않습니다. AI 분석 요청과 추가 질문도 같은 방식으로 처리됩니다. 최초 모델 다운로드 및 업데이트에만 인터넷이 필요합니다."
             )
-            Text("MyAITutor 0.0.1 · Gemma 4 E4B-IT LiteRT-LM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("나만의 AI쌤 0.0.1 · Gemma 4 E4B-IT LiteRT-LM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("실행 환경: 기기 메모리에 맞춰 모델 로딩과 추론이 최적화됩니다.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("현재 백엔드: $backendLabel", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
