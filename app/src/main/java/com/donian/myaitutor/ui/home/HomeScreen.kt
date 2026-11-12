@@ -294,7 +294,7 @@ internal fun HomeScreen(
                         .padding(12.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.SmartToy, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.SmartToy, contentDescription = "AI 도우미", tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(8.dp))
                         Text(
                             if (isAnalyzing) "답변 생성 중" else "AI 생성기",

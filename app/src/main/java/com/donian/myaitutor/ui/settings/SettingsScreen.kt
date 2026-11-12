@@ -136,7 +136,7 @@ internal fun SettingsScreen(
                             Text("모델 파일을 찾았습니다. AI 분석을 바로 사용할 수 있습니다.", style = MaterialTheme.typography.bodySmall)
                         }
                         OutlinedButton(onClick = { showDeleteDialog = true }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.DeleteOutline, contentDescription = null)
+                            Icon(Icons.Default.DeleteOutline, contentDescription = "모델 삭제")
                             Spacer(Modifier.width(7.dp))
                             Text("모델 삭제")
                         }
@@ -147,7 +147,7 @@ internal fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp)
                         ) {
-                            Icon(Icons.Default.CloudDownload, contentDescription = null)
+                            Icon(Icons.Default.CloudDownload, contentDescription = "AI 모델 다운로드")
                             Spacer(Modifier.width(8.dp))
                             Text(if (snapshot.status == ModelDownloadStatus.FAILED) "다시 다운로드" else "AI 모델 다운로드")
                         }
