@@ -1,8 +1,9 @@
 package com.donian.myaitutor.model
 
 import android.app.DownloadManager
+import androidx.core.net.toUri
+import androidx.core.content.edit
 import android.content.Context
-import android.net.Uri
 import android.os.Environment
 import android.os.StatFs
 import java.io.IOException
@@ -80,7 +81,7 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
                         if (EXPECTED_MODEL_SHA256.isNotEmpty() && preferences.getBoolean(KEY_HASH_MISMATCH, false)) {
                             return failedSnapshot("모델 파일 무결성 검증에 실패했습니다. 모델을 다시 다운로드해 주세요.")
                         }
-                        preferences.edit().putBoolean(KEY_COMPLETED, true).apply()
+                        preferences.edit { putBoolean(KEY_COMPLETED, true) }
                         ModelDownloadSnapshot(
                             ModelDownloadStatus.READY,
                             modelFile.length(),
@@ -113,9 +114,9 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
             runCatching { downloadManager.remove(existingId) }
         }
         modelFile.delete()
-        preferences.edit().putBoolean(KEY_COMPLETED, false).apply()
+        preferences.edit { putBoolean(KEY_COMPLETED, false) }
 
-        val request = DownloadManager.Request(Uri.parse(MODEL_DOWNLOAD_URL))
+        val request = DownloadManager.Request(MODEL_DOWNLOAD_URL.toUri())
             .setTitle("MyAITutor 모델 다운로드")
             .setDescription("Gemma 4 E4B-IT · 약 3.66GB · Wi-Fi 전용")
             .setMimeType("application/octet-stream")
@@ -129,7 +130,7 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
             .addRequestHeader("User-Agent", "MyAITutor-Android/0.0.1")
 
         val id = downloadManager.enqueue(request)
-        preferences.edit().putLong(KEY_DOWNLOAD_ID, id).apply()
+        preferences.edit { putLong(KEY_DOWNLOAD_ID, id) }
         return id
     }
 
@@ -137,12 +138,12 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
         val id = preferences.getLong(KEY_DOWNLOAD_ID, -1L)
         if (id >= 0L) runCatching { downloadManager.remove(id) }
         modelFile.delete()
-        preferences.edit()
-            .remove(KEY_DOWNLOAD_ID)
-            .putBoolean(KEY_COMPLETED, false)
-            .putBoolean(KEY_HASH_VERIFIED, false)
-            .putBoolean(KEY_HASH_MISMATCH, false)
-            .apply()
+        preferences.edit {
+            remove(KEY_DOWNLOAD_ID)
+            putBoolean(KEY_COMPLETED, false)
+            putBoolean(KEY_HASH_VERIFIED, false)
+            putBoolean(KEY_HASH_MISMATCH, false)
+        }
     }
 
     override fun isModelReady(): Boolean = snapshot().status == ModelDownloadStatus.READY
@@ -176,10 +177,10 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
             }
             val actual = digest.digest().joinToString("") { "%02x".format(it) }
             val match = actual.equals(EXPECTED_MODEL_SHA256, ignoreCase = true)
-            preferences.edit()
-                .putBoolean(KEY_HASH_VERIFIED, match)
-                .putBoolean(KEY_HASH_MISMATCH, !match)
-                .apply()
+            preferences.edit {
+                putBoolean(KEY_HASH_VERIFIED, match)
+                putBoolean(KEY_HASH_MISMATCH, !match)
+            }
             match
         } catch (e: Exception) {
             false

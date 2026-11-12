@@ -3,6 +3,7 @@ package com.donian.myaitutor.camera
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import androidx.core.graphics.scale
 import androidx.exifinterface.media.ExifInterface
 import java.io.File
 import java.io.FileOutputStream
@@ -55,7 +56,7 @@ object ImageNormalizer {
                 val ratio = MAX_SIDE_PX.toFloat() / maxOf(rotated.width, rotated.height)
                 val w = (rotated.width * ratio).toInt().coerceAtLeast(1)
                 val h = (rotated.height * ratio).toInt().coerceAtLeast(1)
-                Bitmap.createScaledBitmap(rotated, w, h, true).also {
+                rotated.scale(w, h, true).also {
                     if (it != rotated) rotated.recycle()
                 }
             } else {
