@@ -12,6 +12,7 @@
     <!-- 분석/답변 상태 -->
     <string name="status_analyzing">촬영한 문제를 분석하고 있습니다.</string>
     <string name="status_analysis_empty">문제 분석 결과가 비어 있어 선택지를 표시하지 않았습니다.</string>
+    <string name="status_ocr_empty">글자를 찾지 못했습니다. 다시 촬영해 주세요.</string>
     <string name="status_answer_empty_image">AI 답변을 받지 못했습니다. 다시 촬영해 분석을 시도해 주세요.</string>
     <string name="status_answer_empty_followup">AI 답변을 받지 못했습니다. 다시 질문해 주세요.</string>
     <string name="status_analysis_error">AI 분석 중 오류가 발생했습니다.</string>

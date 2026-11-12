@@ -58,11 +58,11 @@ class GemmaAssistant(context: Context) : Assistant {
     }
 
     override suspend fun analyzeImage(
-        imageFile: File,
+        ocrText: String,
         subject: String,
         onTextChanged: suspend (String) -> Unit
     ) = withContext(runtimeDispatcher) {
-        require(imageFile.exists() && imageFile.length() > 0L) { "촬영된 이미지가 없습니다." }
+        require(ocrText.isNotBlank()) { "인식된 문제 텍스트가 없습니다." }
         resetConversation()
         ensureInitializedOnRuntimeThread()
 
@@ -71,7 +71,7 @@ class GemmaAssistant(context: Context) : Assistant {
         streamResponse(
             conversation = requireNotNull(conversation),
             contents = Contents.of(
-                Content.ImageFile(imageFile.absolutePath),
+                Content.Text("[OCR 인식 텍스트]\n$ocrText"),
                 Content.Text(prompt)
             ),
             onTextChanged = onTextChanged

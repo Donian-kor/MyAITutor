@@ -1,6 +1,7 @@
 package com.donian.myaitutor.ui.home
 
 import android.content.Context
+import android.util.Log
 import com.donian.myaitutor.R
 import com.donian.myaitutor.ai.Assistant
 import com.donian.myaitutor.ai.GemmaAssistant
@@ -8,6 +9,7 @@ import com.donian.myaitutor.model.ModelDownloadManager
 import com.donian.myaitutor.model.ModelDownloadRepository
 import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelDownloadStatus
+import com.donian.myaitutor.ocr.OcrTextRecognizer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -31,8 +33,15 @@ class HomeViewModel(
     private val scope: CoroutineScope,
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
     private val enablePolling: Boolean = true,
+    private val ocrTextRecognizer: OcrTextRecognizer =
+        appContext.applicationContext as OcrTextRecognizer,
+    private val ocrLogger: (String) -> Unit = { Log.d(TAG, "OCR 결과:\n$it") },
     private val stringProvider: StringProvider = StringProvider { resId, args -> appContext.getString(resId, *args) }
 ) {
+
+    private companion object {
+        const val TAG = "HomeViewModel"
+    }
 
     private val _state = kotlinx.coroutines.flow.MutableStateFlow(
         HomeUiState(modelSnapshot = modelManager.snapshot())
@@ -124,11 +133,23 @@ class HomeViewModel(
         generationJob = scope.launch {
             var completed = false
             var receivedAnswer = false
-            val imageToAnalyze = withContext(ioDispatcher) {
-                com.donian.myaitutor.camera.ImageNormalizer.normalize(image) ?: image
-            }
+            var imageToAnalyze = image
             try {
-                assistant.analyzeImage(imageToAnalyze, subject) { newText ->
+                imageToAnalyze = withContext(ioDispatcher) {
+                    com.donian.myaitutor.camera.ImageNormalizer.normalize(image) ?: image
+                }
+                val ocrText = ocrTextRecognizer.recognize(imageToAnalyze).joinToString("\n")
+                // TODO: OCR 결과 텍스트의 Logcat 출력을 디버깅 종료 후 제거하세요.
+                ocrLogger(ocrText)
+                if (ocrText.isBlank()) {
+                    if (currentGeneration == generationId) {
+                        _state.value = _state.value.copy(
+                            answer = stringProvider.get(R.string.status_ocr_empty)
+                        )
+                    }
+                    return@launch
+                }
+                assistant.analyzeImage(ocrText, subject) { newText ->
                     if (currentGeneration == generationId) {
                         _state.value = _state.value.copy(answer = newText)
                         receivedAnswer = newText.isNotBlank()
@@ -268,6 +289,7 @@ class HomeViewModel(
                     }
                 _state.value = _state.value.copy(backendLabel = stringProvider.get(R.string.backend_label, assistant.backendLabel()))
             }
+
         }
     }
 }
