@@ -124,11 +124,15 @@ import com.donian.myaitutor.ai.GemmaAssistant
 import com.donian.myaitutor.camera.CameraPreview
 import com.donian.myaitutor.camera.CaptureImageAction
 import com.donian.myaitutor.model.ModelDownloadManager
-import com.donian.myaitutor.model.ModelDownloadSnapshot
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.donian.myaitutor.model.ModelDownloadStatus
 import com.donian.myaitutor.ui.camera.CameraScreen
 import com.donian.myaitutor.ui.home.HomeScreen
+import com.donian.myaitutor.ui.home.HomeViewModel
 import com.donian.myaitutor.ui.settings.SettingsScreen
+import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.ui.components.InfoCard
 import com.donian.myaitutor.ui.home.FollowUpChoice
 import com.donian.myaitutor.ui.home.FollowUpChoices
@@ -163,12 +167,12 @@ private fun File.deleteQuietly() {
     runCatching { if (exists()) delete() }
 }
 
+
 @Composable
 fun FocusAiApp() {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val modelManager = remember(context) { ModelDownloadManager(context) }
-    val assistant = remember(context) { GemmaAssistant(context) }
+    val viewModel: HomeViewModel = viewModel()
+    val uiState by viewModel.state.collectAsState()
 
     var showSettings by remember { mutableStateOf(false) }
     var showCamera by remember { mutableStateOf(false) }
@@ -180,18 +184,6 @@ fun FocusAiApp() {
         )
     }
     var captureAction by remember { mutableStateOf<CaptureImageAction?>(null) }
-    var modelSnapshot by remember { mutableStateOf(modelManager.snapshot()) }
-    var answer by remember { mutableStateOf("") }
-    var inputText by remember { mutableStateOf("") }
-    var showFollowUpChoices by remember { mutableStateOf(false) }
-    var isAnalyzing by remember { mutableStateOf(false) }
-    var generationJob by remember { mutableStateOf<Job?>(null) }
-    var generationId by remember { mutableStateOf(0) }
-    var statusMessage by remember { mutableStateOf<String?>(null) }
-    var cameraError by remember { mutableStateOf<String?>(null) }
-    var backendLabel by remember { mutableStateOf("아직 모델이 실행되지 않았습니다.") }
-    var capturedImage by remember { mutableStateOf<File?>(null) }
-    var cameraCapturedImage by remember { mutableStateOf<File?>(null) }
     val focusManager = LocalFocusManager.current
 
     // 이전 실행에서 남은 촬영 임시 파일을 정리합니다. (C-02)
@@ -204,17 +196,13 @@ fun FocusAiApp() {
     ) { granted ->
         cameraGranted = granted
         if (granted) {
-            cameraError = null
             showCamera = true
         } else {
-            statusMessage = "카메라 권한이 없으면 문제를 촬영할 수 없습니다. 기기 설정에서 카메라 권한을 허용해 주세요."
+            viewModel.setStatusMessage("카메라 권한이 없으면 문제를 촬영할 수 없습니다. 기기 설정에서 카메라 권한을 허용해 주세요.")
         }
     }
 
     fun openCamera() {
-        statusMessage = null
-        cameraError = null
-        cameraCapturedImage = null
         if (cameraGranted) {
             showCamera = true
         } else {
@@ -222,189 +210,67 @@ fun FocusAiApp() {
         }
     }
 
-    fun analyzeImage(image: File, subject: String) {
-        if (isAnalyzing) return
-        val currentGeneration = ++generationId
-        isAnalyzing = true
-        answer = "촬영한 문제를 분석하고 있습니다."
-        showFollowUpChoices = false
-        statusMessage = null
-        generationJob = scope.launch {
-            var completed = false
-            var receivedAnswer = false
-            try {
-                assistant.analyzeImage(image, subject) { newText ->
-                    if (currentGeneration == generationId) {
-                        answer = newText
-                        receivedAnswer = newText.isNotBlank()
-                    }
-                }
-                if (currentGeneration == generationId) {
-                    backendLabel = "실행 백엔드: ${assistant.backendLabel()}"
-                    completed = true
-                    if (!receivedAnswer) {
-                        answer = "AI 답변을 받지 못했습니다. 다시 촬영해 분석을 시도해 주세요."
-                        statusMessage = "문제 분석 결과가 비어 있어 선택지를 표시하지 않았습니다."
-                    }
-                }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                if (currentGeneration == generationId) {
-                    statusMessage = error.localizedMessage ?: "AI 분석 중 오류가 발생했습니다."
-                }
-            } finally {
-                // 분석이 끝나면(성공·실패·중단 모두) 이 작업이 만든 임시 파일은 더 이상 필요 없습니다. (C-02)
-                image.deleteQuietly()
-                if (currentGeneration == generationId) {
-                    isAnalyzing = false
-                    showFollowUpChoices = completed && receivedAnswer
-                    generationJob = null
-                }
-            }
-        }
-    }
-
-    fun sendQuestion(question: String, showChoicesAfterResponse: Boolean = false) {
-        if (question.isBlank() || isAnalyzing) return
-        if (modelSnapshot.status != ModelDownloadStatus.READY) {
-            statusMessage = "AI 모델을 먼저 설치해 주세요."
-            return
-        }
-
-        val currentGeneration = ++generationId
-        val previousAnswer = answer
-        val pendingAnswer = if (previousAnswer.isBlank()) {
-            "학생: $question\n\nAI 답변: "
-        } else {
-            "$previousAnswer\n\n학생: $question\n\nAI 답변: "
-        }
-        isAnalyzing = true
-        showFollowUpChoices = false
-        answer = pendingAnswer
-        inputText = ""
-        statusMessage = null
-        focusManager.clearFocus()
-        generationJob = scope.launch {
-            var completed = false
-            try {
-                assistant.askFollowUp(question) { newText ->
-                    if (currentGeneration == generationId) answer = pendingAnswer + newText
-                }
-                completed = true
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                if (currentGeneration == generationId) {
-                    statusMessage = error.localizedMessage ?: "질문 처리 중 오류가 발생했습니다."
-                }
-            } finally {
-                if (currentGeneration == generationId) {
-                    isAnalyzing = false
-                    showFollowUpChoices = completed && showChoicesAfterResponse
-                    generationJob = null
-                }
-            }
-        }
-    }
-
-    fun cancelGeneration() {
-        // 네이티브 취소 플래그를 먼저 세팅한 뒤 코루틴을 취소해야
-        // 런타임 스레드의 생성 루프가 즉시 멈춥니다.
-        assistant.cancelGeneration()
-        generationJob?.cancel()
-        generationJob = null
-        // 늦게 도착하는 마지막 토큰이 중단 표시를 덮어쓰지 않도록 세대를 무효화합니다.
-        generationId++
-        isAnalyzing = false
-        answer = when {
-            answer.endsWith("AI 답변: ") ->
-                answer.removeSuffix("AI 답변: ").trimEnd() + "\n\n(답변이 중단되었습니다.)"
-            answer.isBlank() || answer == "촬영한 문제를 분석하고 있습니다." -> ""
-            else -> answer.trimEnd() + "\n\n(답변이 중단되었습니다.)"
-        }
-        statusMessage = "AI 답변을 중단했습니다."
-    }
-
     BackHandler(enabled = showCamera) {
         showCamera = false
-        cameraCapturedImage = null
-        cameraError = null
+        uiState.cameraCapturedImage?.deleteQuietly()
+        viewModel.clearCameraCapturedImage()
     }
 
-    LaunchedEffect(modelSnapshot.status) {
-        if (modelSnapshot.status == ModelDownloadStatus.READY) {
-            scope.launch {
-                assistant.preWarm()
-                backendLabel = "실행 백엔드: ${assistant.backendLabel()}"
-            }
+    LaunchedEffect(uiState.modelSnapshot.status) {
+        if (uiState.modelSnapshot.status == ModelDownloadStatus.READY) {
+            viewModel.preWarmIfNeeded()
+        } else if (uiState.modelSnapshot.status == ModelDownloadStatus.NOT_INSTALLED) {
+            viewModel.setStatusMessage("AI 모델을 다운로드하면 촬영한 문제를 풀이할 수 있습니다.")
         }
     }
 
     if (showSettings) {
         SettingsScreen(
-            snapshot = modelSnapshot,
-            backendLabel = backendLabel,
+            snapshot = uiState.modelSnapshot,
+            backendLabel = uiState.backendLabel,
             onBack = { showSettings = false },
-            onDownload = {
-                runCatching { modelManager.startDownload() }
-                    .onSuccess { statusMessage = "Wi-Fi에서 AI 모델 다운로드가 시작됩니다." }
-                    .onFailure { statusMessage = it.localizedMessage ?: "다운로드를 시작하지 못했습니다." }
-                modelSnapshot = modelManager.snapshot()
-            },
-            onDeleteModel = {
-                scope.launch {
-                    assistant.release()
-                    modelManager.deleteModel()
-                    modelSnapshot = modelManager.snapshot()
-                    backendLabel = "모델이 모두 삭제되었습니다."
-                }
-            }
+            onDownload = { viewModel.startDownload() },
+            onDeleteModel = { viewModel.deleteModel() }
         )
     } else if (showCamera) {
         CameraScreen(
-            capturedImage = cameraCapturedImage,
+            capturedImage = uiState.cameraCapturedImage,
             captureAction = captureAction,
-            cameraError = cameraError,
+            cameraError = uiState.cameraError,
             onCaptureActionReady = { captureAction = it },
-            onCameraError = { cameraError = it },
+            onCameraError = { viewModel.onCameraError(it) },
             onBack = {
                 showCamera = false
-                cameraCapturedImage?.deleteQuietly()
-                cameraCapturedImage = null
-                cameraError = null
+                uiState.cameraCapturedImage?.deleteQuietly()
+                viewModel.clearCameraCapturedImage()
             },
             onCapture = {
                 val action = captureAction
                 if (action == null) {
-                    cameraError = "카메라가 준비되지 않았습니다. 잠시 후 다시 시도해 주세요."
+                    viewModel.onCameraError("카메라가 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.")
                 } else {
                     val imageFile = File(context.cacheDir, "focus_capture_${System.currentTimeMillis()}.jpg")
                     action(imageFile) { result ->
-                        result.onSuccess { cameraCapturedImage = it }
+                        result.onSuccess { viewModel.setCameraCapturedImage(it) }
                             .onFailure { error ->
-                                cameraError = error.localizedMessage ?: "촬영 이미지를 처리하지 못했습니다."
+                                viewModel.onCameraError(error.localizedMessage ?: "촬영 이미지를 처리하지 못했습니다.")
                             }
                     }
                 }
             },
             onRetake = {
-                cameraCapturedImage?.deleteQuietly()
-                cameraCapturedImage = null
-                cameraError = null
+                uiState.cameraCapturedImage?.deleteQuietly()
+                viewModel.clearCameraCapturedImage()
             },
             onConfirm = {
-                val image = cameraCapturedImage
+                val image = uiState.cameraCapturedImage
                 if (image != null) {
-                    capturedImage = image
-                    cameraCapturedImage = null
+                    viewModel.confirmCapture(image)
                     showCamera = false
-                    cameraError = null
-                    if (modelSnapshot.status == ModelDownloadStatus.READY) {
-                        analyzeImage(image, selectedSubject)
+                    if (uiState.modelSnapshot.status == ModelDownloadStatus.READY) {
+                        viewModel.analyzeImage(image, selectedSubject)
                     } else {
-                        answer = "사진을 확인했습니다. AI 모델을 설치하면 문제 풀이를 시작할 수 있습니다."
-                        statusMessage = "설정에서 Gemma 4 E4B 모델을 다운로드해 주세요."
+                        viewModel.setStatusMessage("사진을 확인했습니다. AI 모델을 설치하면 문제 풀이를 시작할 수 있습니다.")
                     }
                 }
             }
@@ -415,31 +281,23 @@ fun FocusAiApp() {
             onSubjectSelected = {
                 if (selectedSubject != it) {
                     selectedSubject = it
-                    capturedImage = null
-                    answer = ""
-                    inputText = ""
-                    showFollowUpChoices = false
-                    statusMessage = null
+                    viewModel.resetForNewSubject()
                 }
             },
-            capturedImage = capturedImage,
-            modelReady = modelSnapshot.status == ModelDownloadStatus.READY,
+            capturedImage = uiState.capturedImage,
+            modelReady = uiState.modelSnapshot.status == ModelDownloadStatus.READY,
             onOpenSettings = { showSettings = true },
             onOpenCamera = ::openCamera,
-            answer = answer,
-            inputText = inputText,
-            onInputChange = { inputText = it },
-            isAnalyzing = isAnalyzing,
-            statusMessage = statusMessage,
-            onDismissStatus = { statusMessage = null },
-            onSend = { sendQuestion(inputText) },
-            onSendChoice = { sendQuestion(it, showChoicesAfterResponse = true) },
-            showFollowUpChoices = showFollowUpChoices,
-            onCancelGeneration = ::cancelGeneration
+            answer = uiState.answer,
+            inputText = uiState.inputText,
+            onInputChange = { viewModel.onInputChange(it) },
+            isAnalyzing = uiState.isAnalyzing,
+            statusMessage = uiState.statusMessage,
+            onDismissStatus = { viewModel.dismissStatus() },
+            onSend = { viewModel.sendQuestion(uiState.inputText); focusManager.clearFocus() },
+            onSendChoice = { prompt -> viewModel.sendQuestion(prompt, showChoicesAfterResponse = true) },
+            showFollowUpChoices = uiState.showFollowUpChoices,
+            onCancelGeneration = { viewModel.cancelGeneration() }
         )
     }
 }
-
-
-
-
