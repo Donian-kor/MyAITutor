@@ -12,9 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.unit.dp
+import com.donian.myaitutor.R
 
 /**
  * 상단에 표시되는 상태/안내 메시지. 필요 시 "다시 시도" 버튼을 함께 노출한다.
@@ -32,7 +32,7 @@ internal fun StatusBanner(
             .fillMaxWidth()
             .padding(top = 4.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFFFF0E8))
+            .background(colorResource(id = R.color.status_banner_background))
             .padding(start = 10.dp, top = 5.dp, bottom = 5.dp, end = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -40,7 +40,7 @@ internal fun StatusBanner(
             message,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFF8A3C16)
+            color = colorResource(id = R.color.status_banner_text)
         )
         if (canRetry) {
             TextButton(onClick = onRetry) { Text("다시 시도") }
