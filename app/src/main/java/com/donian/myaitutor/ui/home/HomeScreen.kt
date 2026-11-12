@@ -121,110 +121,17 @@ internal fun HomeScreen(
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     val compact = maxWidth < 360.dp
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = onOpenCamera,
-                            enabled = !isAnalyzing,
-                            modifier = if (compact) Modifier.size(48.dp) else Modifier.height(48.dp),
-                            shape = RoundedCornerShape(24.dp),
-                            contentPadding = if (compact) PaddingValues(0.dp) else PaddingValues(horizontal = 12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                                contentColor = MaterialTheme.colorScheme.primary,
-                                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.04f),
-                                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                            ),
-                            border = BorderStroke(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-                            )
-                        ) {
-                            Icon(
-                                Icons.Default.PhotoCamera,
-                                contentDescription = if (compact) "문제 촬영" else null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            if (!compact) {
-                                Spacer(Modifier.width(6.dp))
-                                Text("촬영")
-                            }
-                        }
-
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 48.dp, max = 88.dp),
-                            shape = RoundedCornerShape(24.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 48.dp, max = 88.dp)
-                                    .padding(horizontal = 14.dp),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                BasicTextField(
-                                    value = inputText,
-                                    onValueChange = onInputChange,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(min = 24.dp, max = 64.dp)
-                                        .focusRequester(inputFocusRequester),
-                                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    ),
-                                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                                    maxLines = 3,
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                                    keyboardActions = KeyboardActions(
-                                        onSend = { if (inputText.isNotBlank() && !isAnalyzing) onSend() }
-                                    ),
-                                    decorationBox = { innerTextField ->
-                                        Box {
-                                            if (inputText.isEmpty()) {
-                                                Text(
-                                                    if (answer.isBlank()) "질문 입력" else "추가 질문 입력",
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    maxLines = 1
-                                                )
-                                            }
-                                            innerTextField()
-                                        }
-                                    }
-                                )
-                            }
-                        }
-
-                        if (isAnalyzing) {
-                            FilledTonalButton(
-                                onClick = onCancelGeneration,
-                                modifier = Modifier.size(48.dp),
-                                shape = RoundedCornerShape(24.dp),
-                                contentPadding = PaddingValues(0.dp),
-                                colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            ) {
-                                Icon(Icons.Default.Stop, contentDescription = "답변 중단")
-                            }
-                        } else {
-                            FilledIconButton(
-                                onClick = onSend,
-                                enabled = inputText.isNotBlank(),
-                                modifier = Modifier.size(48.dp)
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "질문 보내기")
-                            }
-                        }
-                    }
+                    ComposerBar(
+                        compact = compact,
+                        inputText = inputText,
+                        answer = answer,
+                        isAnalyzing = isAnalyzing,
+                        inputFocusRequester = inputFocusRequester,
+                        onInputChange = onInputChange,
+                        onOpenCamera = onOpenCamera,
+                        onSend = onSend,
+                        onCancelGeneration = onCancelGeneration
+                    )
                 }
             }
         }
