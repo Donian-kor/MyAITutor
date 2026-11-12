@@ -18,7 +18,6 @@ class HomeViewModelHost(application: Application) : AndroidViewModel(application
     )
 
     override fun onCleared() {
-        super.onCleared()
         homeViewModel.close()
     }
 }
