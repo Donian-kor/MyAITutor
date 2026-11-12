@@ -107,8 +107,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         generationJob = viewModelScope.launch {
             var completed = false
             var receivedAnswer = false
+            val imageToAnalyze = withContext(Dispatchers.IO) {
+                com.donian.myaitutor.camera.ImageNormalizer.normalize(image) ?: image
+            }
             try {
-                assistant.analyzeImage(image, subject) { newText ->
+                assistant.analyzeImage(imageToAnalyze, subject) { newText ->
                     if (currentGeneration == generationId) {
                         _state.value = _state.value.copy(answer = newText)
                         receivedAnswer = newText.isNotBlank()
@@ -135,6 +138,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } finally {
                 runCatching { if (image.exists()) image.delete() }
+                if (imageToAnalyze != image) runCatching { if (imageToAnalyze.exists()) imageToAnalyze.delete() }
                 if (currentGeneration == generationId) {
                     _state.value = _state.value.copy(
                         isAnalyzing = false,

@@ -79,6 +79,9 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraX")
     implementation("androidx.camera:camera-view:$cameraX")
 
+    // EXIF orientation 보정용.
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+
     // Gemma 4 E4B-IT LiteRT-LM Android runtime.
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.0")
 
