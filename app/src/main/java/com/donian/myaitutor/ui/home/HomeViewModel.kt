@@ -260,6 +260,12 @@ class HomeViewModel(
         scope.launch {
             if (_state.value.modelSnapshot.status == ModelDownloadStatus.READY) {
                 runCatching { assistant.preWarm() }
+                    .onFailure { error ->
+                        _state.value = _state.value.copy(
+                            statusMessage = error.localizedMessage
+                                ?: stringProvider(R.string.status_model_prewarm_failed)
+                        )
+                    }
                 _state.value = _state.value.copy(backendLabel = "실행 백엔드: ${assistant.backendLabel()}")
             }
         }

@@ -1,6 +1,7 @@
 package com.donian.myaitutor.ai
 
 import android.content.Context
+import android.util.Log
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
@@ -27,6 +28,11 @@ import java.util.concurrent.Executors
  */
 class GemmaAssistant(context: Context) : Assistant {
     private val appContext = context.applicationContext
+
+    companion object {
+        private const val TAG = "GemmaAssistant"
+    }
+
     private val runtimeDispatcher = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "focus-ai-litert-runtime").apply { isDaemon = true }
     }.asCoroutineDispatcher()
@@ -39,7 +45,12 @@ class GemmaAssistant(context: Context) : Assistant {
 
     override suspend fun preWarm() {
         withContext(runtimeDispatcher) {
-            runCatching { ensureInitializedOnRuntimeThread() }
+            try {
+                ensureInitializedOnRuntimeThread()
+            } catch (error: Exception) {
+                Log.w(TAG, "모델 사전 로드에 실패했습니다: ${error.message}", error)
+                throw error
+            }
         }
     }
 

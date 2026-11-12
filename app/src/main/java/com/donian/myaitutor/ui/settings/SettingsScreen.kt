@@ -143,13 +143,20 @@ internal fun SettingsScreen(
                     } else {
                         Button(
                             onClick = onDownload,
-                            enabled = !isBusy,
+                            // 다운로드 중일 때만 비활성. PAUSED/QUEUED 는 재시도 가능해야 한다. (R-07)
+                            enabled = snapshot.status != ModelDownloadStatus.DOWNLOADING,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp)
                         ) {
                             Icon(Icons.Default.CloudDownload, contentDescription = "AI 모델 다운로드")
                             Spacer(Modifier.width(8.dp))
-                            Text(if (snapshot.status == ModelDownloadStatus.FAILED) "다시 다운로드" else "AI 모델 다운로드")
+                            Text(
+                                when (snapshot.status) {
+                                    ModelDownloadStatus.FAILED -> "다시 다운로드"
+                                    ModelDownloadStatus.PAUSED, ModelDownloadStatus.QUEUED -> "다시 시도"
+                                    else -> "AI 모델 다운로드"
+                                }
+                            )
                         }
                     }
                 }
