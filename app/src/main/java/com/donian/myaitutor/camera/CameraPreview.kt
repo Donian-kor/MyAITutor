@@ -101,12 +101,22 @@ fun CameraPreview(
                     .build()
 
                 provider.unbindAll()
-                provider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
-                    capture
-                )
+                try {
+                    provider.bindToLifecycle(
+                        lifecycleOwner,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview,
+                        capture
+                    )
+                } catch (backError: Exception) {
+                    // 후면 카메라가 없는 기기(또는 사용 불가)에서는 전면으로 대체합니다.
+                    provider.bindToLifecycle(
+                        lifecycleOwner,
+                        CameraSelector.DEFAULT_FRONT_CAMERA,
+                        preview,
+                        capture
+                    )
+                }
                 imageCapture = capture
             } catch (error: Exception) {
                 onCameraError(error.localizedMessage ?: "카메라를 시작하지 못했습니다.")

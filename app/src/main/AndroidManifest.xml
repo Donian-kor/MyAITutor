@@ -6,10 +6,11 @@
 
     <uses-feature
         android:name="android.hardware.camera.any"
-        android:required="false" />
+        android:required="true" />
 
     <application
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:icon="@drawable/ic_myaitutor"
         android:label="@string/app_name"
@@ -27,7 +28,7 @@
 
         <activity
             android:name=".MainActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode|density|fontScale"
             android:exported="true"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
