@@ -3,6 +3,22 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val gitCommitCount = try {
+    val process = ProcessBuilder("git", "rev-list", "--count", "HEAD")
+        .directory(rootProject.projectDir)
+        .redirectErrorStream(true)
+        .start()
+    val output = process.inputStream.bufferedReader().use { it.readText().trim() }
+    if (process.waitFor() == 0) output.toIntOrNull()?.takeIf { it > 0 } else null
+} catch (error: java.io.IOException) {
+    logger.warn("Git 커밋 수를 확인할 수 없어 앱 버전을 1로 설정합니다: ${error.message}")
+    null
+} catch (error: InterruptedException) {
+    Thread.currentThread().interrupt()
+    logger.warn("Git 커밋 수 조회가 중단되어 앱 버전을 1로 설정합니다.")
+    null
+} ?: 1
+
 android {
     namespace = "com.donian.myaitutor"
     compileSdk = 37
@@ -11,8 +27,9 @@ android {
         applicationId = "com.donian.myaitutor"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.0.1"
+        // 커밋이 추가되면 Android versionCode와 표시 버전이 함께 증가합니다.
+        versionCode = gitCommitCount
+        versionName = "0.${gitCommitCount / 10}.${gitCommitCount % 10}"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

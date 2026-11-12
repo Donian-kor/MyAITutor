@@ -165,6 +165,11 @@ internal fun SettingsScreen(
             }
 
             InfoCard(
+                icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                title = stringResource(R.string.settings_ocr_title),
+                body = stringResource(R.string.settings_ocr_details)
+            )
+            InfoCard(
                 icon = { Icon(Icons.Default.Wifi, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 title = stringResource(R.string.info_download_title),
                 body = stringResource(R.string.info_download_body)

@@ -34,6 +34,8 @@
     <string name="settings_model_status">모델 상태</string>
     <string name="settings_runtime_env">실행 환경: 기기 메모리에 맞춰 모델 로딩과 추론이 최적화됩니다.</string>
     <string name="settings_current_backend">현재 백엔드: %1$s</string>
+    <string name="settings_ocr_title">OCR 모델 및 출처</string>
+    <string name="settings_ocr_details">인식 모델: korean_PP-OCRv5_mobile_rec\n검출 모델: models/det/inference.onnx (세부 모델 ID는 확인되지 않음)\n모델 문서: https://www.paddleocr.ai/latest/version3.x/module_usage/text_recognition.html\nAndroid SDK: https://github.com/PaddlePaddle/PaddleOCR/tree/main/deploy/ppocr-android</string>
 
     <string name="model_status_ready">설치 완료</string>
     <string name="model_status_downloading">다운로드 중</string>
