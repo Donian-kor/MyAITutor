@@ -15,6 +15,12 @@ android {
         versionName = "0.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // LiteRT-LM 네이티브 라이브러리는 64비트만 제공한다.
+        // 32비트 기기에서는 실행 즉시 실패하므로 APK에서 제외해 설치 자체를 막는다.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     buildFeatures {

@@ -127,8 +127,10 @@ import com.donian.myaitutor.model.ModelDownloadManager
 import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelDownloadStatus
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 private val Subjects = listOf("국어", "영어", "수학", "과학", "사회", "경제", "철학", "정보", "기타")
@@ -304,6 +306,23 @@ private fun AssistantAnswer(text: String, modifier: Modifier = Modifier) {
     }
 }
 
+/** 촬영 임시 파일 이름 접두사. cacheDir 정리 대상 식별에 사용합니다. */
+private const val CaptureFilePrefix = "focus_capture_"
+
+/** 아직 남아 있는 촬영 임시 파일 중 1시간이 지난 것만 지웁니다. 사용 중인 파일은 건드리지 않습니다. */
+private fun File.deleteStaleCaptures(now: Long = System.currentTimeMillis()) {
+    runCatching {
+        listFiles { file -> file.name.startsWith(CaptureFilePrefix) }?.forEach { file ->
+            if (now - file.lastModified() > 60L * 60L * 1000L) file.delete()
+        }
+    }
+}
+
+/** 촬영 임시 파일을 지웁니다. 이미 없거나 삭제에 실패해도 예외를 던지지 않습니다. */
+private fun File.deleteQuietly() {
+    runCatching { if (exists()) delete() }
+}
+
 @Composable
 fun FocusAiApp() {
     val context = LocalContext.current
@@ -335,6 +354,11 @@ fun FocusAiApp() {
     var cameraCapturedImage by remember { mutableStateOf<File?>(null) }
     val focusManager = LocalFocusManager.current
 
+    // 이전 실행에서 남은 촬영 임시 파일을 정리합니다. (C-02)
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) { context.cacheDir.deleteStaleCaptures() }
+    }
+
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -343,7 +367,7 @@ fun FocusAiApp() {
             cameraError = null
             showCamera = true
         } else {
-            statusMessage = "카메라 권한이 필요하면 문제를 촬영할 수 없습니다."
+            statusMessage = "카메라 권한이 없으면 문제를 촬영할 수 없습니다. 기기 설정에서 카메라 권한을 허용해 주세요."
         }
     }
 
@@ -390,6 +414,8 @@ fun FocusAiApp() {
                     statusMessage = error.localizedMessage ?: "AI 분석 중 오류가 발생했습니다."
                 }
             } finally {
+                // 분석이 끝나면(성공·실패·중단 모두) 이 작업이 만든 임시 파일은 더 이상 필요 없습니다. (C-02)
+                image.deleteQuietly()
                 if (currentGeneration == generationId) {
                     isAnalyzing = false
                     showFollowUpChoices = completed && receivedAnswer
@@ -504,6 +530,7 @@ fun FocusAiApp() {
             onCameraError = { cameraError = it },
             onBack = {
                 showCamera = false
+                cameraCapturedImage?.deleteQuietly()
                 cameraCapturedImage = null
                 cameraError = null
             },
@@ -522,6 +549,7 @@ fun FocusAiApp() {
                 }
             },
             onRetake = {
+                cameraCapturedImage?.deleteQuietly()
                 cameraCapturedImage = null
                 cameraError = null
             },
@@ -1179,7 +1207,7 @@ private fun SettingsScreen(
             InfoCard(
                 icon = { Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 title = "개인정보 오프라인 처리",
-                body = "문제 촬영과 분석은 모두 앱에서 처리되어 서버로 저장되지 않습니다. AI 분석 요청과 추가 질문은 로컬 AI 서버로 전송되며 학습합니다. 최초 모델 다운로드 및 업데이트는 인터넷이 필요합니다."
+                body = "문제 촬영과 분석은 모두 기기 안에서 처리되며 외부 서버로 전송되지 않습니다. AI 분석 요청과 추가 질문도 같은 방식으로 처리됩니다. 최초 모델 다운로드 및 업데이트에만 인터넷이 필요합니다."
             )
             Text("MyAITutor 0.0.1 · Gemma 4 E4B-IT LiteRT-LM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("실행 환경: 기기 메모리에 맞춰 모델 로딩과 추론이 최적화됩니다.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
