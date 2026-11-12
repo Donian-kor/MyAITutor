@@ -62,8 +62,12 @@ class HomeViewModel(
         }
     }
 
+    /**
+     * 앱/화면 종료 시 엔진 자원을 해제합니다. scope 자체는 소유자가 관리합니다.
+     */
     fun close() {
-        // scope.cancel()은 호출자(scope 소유자)가 관리합니다.
+        generationJob?.cancel()
+        scope.launch { runCatching { assistant.release() } }
     }
 
     fun onInputChange(text: String) {

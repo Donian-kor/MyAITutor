@@ -11,7 +11,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -26,6 +25,7 @@ import com.donian.myaitutor.model.ModelDownloadStatus
 import com.donian.myaitutor.ui.camera.CameraRoute
 import com.donian.myaitutor.ui.home.HomeScreen
 import com.donian.myaitutor.ui.home.HomeViewModel
+import com.donian.myaitutor.ui.home.HomeViewModelHost
 import com.donian.myaitutor.ui.settings.SettingsScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,13 +37,9 @@ import com.donian.myaitutor.ui.home.deleteStaleCaptures
 fun FocusAiApp() {
     val context = LocalContext.current
     val activity = LocalActivity.current
-    val scope = rememberCoroutineScope()
-    val viewModel: HomeViewModel = remember(scope) {
-        HomeViewModel(
-            appContext = context.applicationContext,
-            scope = scope
-        )
-    }
+    // ViewModelStore에 보관되어 회전 시에도 대화/입력 상태가 유지된다.
+    val host: HomeViewModelHost = viewModel()
+    val viewModel: HomeViewModel = host.homeViewModel
     val uiState by viewModel.state.collectAsState()
 
     var showSettings by remember { mutableStateOf(false) }
