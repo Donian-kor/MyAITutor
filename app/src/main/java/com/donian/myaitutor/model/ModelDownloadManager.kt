@@ -232,7 +232,7 @@ data class ModelDownloadSnapshot(
     val totalLabel: String
         get() = if (totalBytes > 0L) formatBytes(totalBytes) else "알 수 없음"
 
-    private fun formatBytes(bytes: Long): String {
+    internal fun formatBytes(bytes: Long): String {
         if (bytes <= 0L) return "0 MB"
         val gb = bytes / 1_000_000_000.0
         return if (gb >= 1.0) String.format("%.2f GB", gb) else String.format("%.0f MB", bytes / 1_000_000.0)
