@@ -83,5 +83,8 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
+    // 단위 테스트: 순수 함수(파서 등) 검증용. Android 의존성이 없는 모듈만 대상.
+    testImplementation("junit:junit:4.13.2")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
