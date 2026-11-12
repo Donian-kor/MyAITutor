@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.donian.myaitutor.R
 import com.donian.myaitutor.camera.CaptureImageAction
 import com.donian.myaitutor.model.ModelDownloadStatus
 import com.donian.myaitutor.ui.home.CaptureFilePrefix
@@ -24,6 +26,9 @@ internal fun CameraRoute(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.state.collectAsState()
+    val cameraNotReady = stringResource(R.string.status_camera_not_ready)
+    val captureFailed = stringResource(R.string.status_capture_failed)
+    val photoConfirmedNoModel = stringResource(R.string.status_photo_confirmed_no_model)
 
     CameraScreen(
         capturedImage = uiState.cameraCapturedImage,
@@ -39,13 +44,13 @@ internal fun CameraRoute(
         onCapture = {
             val action = captureAction
             if (action == null) {
-                viewModel.onCameraError("카메라가 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.")
+                viewModel.onCameraError(cameraNotReady)
             } else {
                 val imageFile = File(context.cacheDir, "$CaptureFilePrefix${System.currentTimeMillis()}.jpg")
                 action(imageFile) { result ->
                     result.onSuccess { viewModel.setCameraCapturedImage(it) }
                         .onFailure { error ->
-                            viewModel.onCameraError(error.localizedMessage ?: "촬영 이미지를 처리하지 못했습니다.")
+                            viewModel.onCameraError(error.localizedMessage ?: captureFailed)
                         }
                 }
             }
@@ -62,7 +67,7 @@ internal fun CameraRoute(
                 if (uiState.modelSnapshot.status == ModelDownloadStatus.READY) {
                     viewModel.analyzeImage(image, selectedSubject)
                 } else {
-                    viewModel.setStatusMessage("사진을 확인했습니다. AI 모델을 설치하면 문제 풀이를 시작할 수 있습니다.")
+                    viewModel.setStatusMessage(photoConfirmedNoModel)
                 }
             }
         }

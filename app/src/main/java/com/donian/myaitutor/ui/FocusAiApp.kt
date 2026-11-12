@@ -14,7 +14,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
+import com.donian.myaitutor.R
 import com.donian.myaitutor.camera.CaptureImageAction
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -52,6 +54,8 @@ fun FocusAiApp() {
     }
     var captureAction by remember { mutableStateOf<CaptureImageAction?>(null) }
     val focusManager = LocalFocusManager.current
+    val cameraPermissionDenied = stringResource(R.string.status_camera_permission_denied)
+    val modelDownloadAvailable = stringResource(R.string.status_model_download_available)
 
     // 이전 실행에서 남은 촬영 임시 파일을 정리합니다. (C-02)
     LaunchedEffect(Unit) {
@@ -65,7 +69,7 @@ fun FocusAiApp() {
         if (granted) {
             showCamera = true
         } else {
-            viewModel.setStatusMessage("카메라 권한이 없으면 문제를 촬영할 수 없습니다. 기기 설정에서 카메라 권한을 허용해 주세요.")
+            viewModel.setStatusMessage(cameraPermissionDenied)
         }
     }
 
@@ -87,7 +91,7 @@ fun FocusAiApp() {
         if (uiState.modelSnapshot.status == ModelDownloadStatus.READY) {
             viewModel.preWarmIfNeeded()
         } else if (uiState.modelSnapshot.status == ModelDownloadStatus.NOT_INSTALLED) {
-            viewModel.setStatusMessage("AI 모델을 다운로드하면 촬영한 문제를 풀이할 수 있습니다.")
+            viewModel.setStatusMessage(modelDownloadAvailable)
         }
     }
 

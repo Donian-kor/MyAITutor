@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.donian.myaitutor.R
 
@@ -43,8 +44,8 @@ internal fun StatusBanner(
             color = colorResource(id = R.color.status_banner_text)
         )
         if (canRetry) {
-            TextButton(onClick = onRetry) { Text("다시 시도") }
+            TextButton(onClick = onRetry) { Text(stringResource(R.string.btn_retry)) }
         }
-        TextButton(onClick = onDismiss) { Text("닫기") }
+        TextButton(onClick = onDismiss) { Text(stringResource(R.string.btn_dismiss)) }
     }
 }
