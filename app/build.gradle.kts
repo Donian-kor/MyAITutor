@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.donian.myaitutor"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "0.0.1"
@@ -55,6 +55,8 @@ android {
 }
 
 dependencies {
+    implementation(project(":ppocr-sdk"))
+
     val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)

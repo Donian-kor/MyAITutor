@@ -15,4 +15,4 @@ pluginManagement {
 }
 
 rootProject.name = "MyAITutor"
-include(":app")
+include(":app", ":ppocr-sdk")
