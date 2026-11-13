@@ -32,6 +32,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 /**
@@ -66,6 +68,9 @@ class HomeViewModel(
 
         /** 네이티브 취소가 끝났다는 확인을 기다리는 최대 시간. */
         const val CANCEL_CONFIRM_TIMEOUT_MS = 15_000L
+
+        /** 종료 시 엔진 해제를 기다리는 최대 시간. */
+        const val ENGINE_RELEASE_WAIT_MS = 3_000L
     }
 
     private val _state = MutableStateFlow(
@@ -78,6 +83,9 @@ class HomeViewModel(
 
     /** 엔진 워밍업 중복 실행을 막는 Job. 시작 로딩 화면이 이 상태를 구독합니다. */
     private var warmupJob: Job? = null
+
+    /** 종료 시 엔진이 한 번만 해제되도록 보장합니다. */
+    private var isClosed = false
 
     /** 사용자가 중단을 요청한 generationId. 정상 오류와 취소를 구분합니다. */
     private var userCancelledGeneration: Int? = null
@@ -109,17 +117,33 @@ class HomeViewModel(
     }
 
     /**
-     * 앱/화면 종료 시 엔진 자원을 해제합니다. scope 자체는 소유자가 관리합니다.
+     * 앱 종료 시 엔진 자원을 해제합니다. scope 자체는 소유자가 관리합니다.
+     *
+     * [onCleared]와 [MainActivity.onDestroy]에서 모두 호출될 수 있으므로
+     * [isClosed]로 한 번만 해제하도록 보장합니다.
+     *
+     * 종료 시점에는 viewModelScope가 이미 취소된 상태일 수 있으므로
+     * scope.launch 대신 동기적으로 release()를 끝까지 실행합니다.
+     * 진행 중인 추론이 있으면 짧게 대기한 뒤 엔진을 해제합니다.
      */
     fun close() {
+        if (isClosed) return
+        isClosed = true
         generationId++
         userCancelledGeneration = null
         tutorEngine.cancelGeneration()
-        generationJob?.cancel()
-        generationJob = null
         warmupJob?.cancel()
         warmupJob = null
-        scope.launch { runCatching { tutorEngine.release() } }
+        generationJob?.cancel()
+        generationJob = null
+        runCatching {
+            runBlocking {
+                withTimeoutOrNull(ENGINE_RELEASE_WAIT_MS) {
+                    tutorEngine.awaitGenerationStopped(ENGINE_RELEASE_WAIT_MS)
+                }
+                tutorEngine.release()
+            }
+        }
     }
 
     fun onInputChange(text: String) {

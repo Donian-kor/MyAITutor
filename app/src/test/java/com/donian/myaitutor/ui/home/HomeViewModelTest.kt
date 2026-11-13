@@ -447,4 +447,14 @@ class HomeViewModelTest {
         assertFalse(assistantRequest.options.thinkingEnabled)
         assertEquals(0, assistantRequest.options.thinkingTokenBudget)
     }
+
+    @Test
+    fun `close는 엔진을 한 번만 해제한다`() = runTest {
+        val engine = FakeGemmaTutorEngine()
+        val (vm, _) = createViewModel(this, engine = engine)
+        vm.close()
+        vm.close()
+        assertEquals(1, engine.releaseCalls)
+        advanceUntilIdle()
+    }
 }

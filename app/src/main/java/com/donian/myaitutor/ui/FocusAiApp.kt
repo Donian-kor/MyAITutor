@@ -21,7 +21,6 @@ import androidx.core.content.ContextCompat
 import com.donian.myaitutor.R
 import com.donian.myaitutor.camera.CaptureImageAction
 import androidx.compose.runtime.collectAsState
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.donian.myaitutor.model.ModelDownloadStatus
 import com.donian.myaitutor.ui.camera.CameraRoute
 import com.donian.myaitutor.ui.home.HomeScreen
@@ -38,11 +37,10 @@ import com.donian.myaitutor.ui.home.deleteQuietly
 import com.donian.myaitutor.ui.home.deleteStaleCaptures
 
 @Composable
-fun FocusAiApp() {
+fun FocusAiApp(host: HomeViewModelHost) {
     val context = LocalContext.current
     val activity = LocalActivity.current
     // ViewModelStore에 보관되어 회전 시에도 대화/입력 상태가 유지된다.
-    val host: HomeViewModelHost = viewModel()
     val viewModel: HomeViewModel = host.homeViewModel
     val uiState by viewModel.state.collectAsState()
 
@@ -97,6 +95,12 @@ fun FocusAiApp() {
         showCamera = false
         uiState.cameraCapturedImage?.deleteQuietly()
         viewModel.clearCameraCapturedImage()
+    }
+
+    // 뒤로가기: 앱을 완전히 종료하고 모델 메모리를 즉시 해제합니다.
+    BackHandler(enabled = !showCamera && !showSettings) {
+        viewModel.close()
+        activity?.finishAndRemoveTask()
     }
 
     LaunchedEffect(uiState.modelSnapshot.status) {
