@@ -105,9 +105,6 @@ fun FocusAiApp() {
         SettingsScreen(
             snapshot = uiState.modelSnapshot,
             backendLabel = uiState.backendLabel,
-            tokenCount = uiState.tokenCount,
-            maxContextTokens = uiState.maxContextTokens,
-            maxOutputTokens = uiState.maxOutputTokens,
             onBack = { showSettings = false },
             onDownload = { viewModel.startDownload() },
             onDeleteModel = { viewModel.deleteModel() },
@@ -140,6 +137,8 @@ fun FocusAiApp() {
             onInputChange = { viewModel.onInputChange(it) },
             isAnalyzing = uiState.isAnalyzing,
             analysisStage = uiState.analysisStage,
+            tokenCount = uiState.tokenCount,
+            maxContextTokens = uiState.maxContextTokens,
             statusMessage = uiState.statusMessage,
             onDismissStatus = { viewModel.dismissStatus() },
             onRetryAnalysis = {
@@ -149,7 +148,11 @@ fun FocusAiApp() {
             onSend = { viewModel.sendQuestion(uiState.inputText); focusManager.clearFocus() },
             onSendChoice = { prompt -> viewModel.sendQuestion(prompt, showChoicesAfterResponse = true) },
             showFollowUpChoices = uiState.showFollowUpChoices,
-            onCancelGeneration = { viewModel.cancelGeneration() }
+            onCancelGeneration = { viewModel.cancelGeneration() },
+            selectedGrade = uiState.selectedGrade,
+            onGradeSelected = { viewModel.selectGrade(it) },
+            tutorState = uiState.tutorState,
+            onRecoverTutor = { viewModel.recoverTutor() }
         )
     }
 }

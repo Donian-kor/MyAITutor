@@ -5,17 +5,30 @@ import android.util.Log
 import com.donian.myaitutor.R
 import com.donian.myaitutor.ai.Assistant
 import com.donian.myaitutor.ai.GemmaAssistant
+import com.donian.myaitutor.ai.TutorGrade
+import com.donian.myaitutor.ai.followUpAnswerPrefix
 import com.donian.myaitutor.camera.ImageCropper
 import com.donian.myaitutor.camera.ImageSelection
 import com.donian.myaitutor.model.ModelDownloadManager
 import com.donian.myaitutor.model.ModelDownloadRepository
-import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelDownloadStatus
+import com.donian.myaitutor.ocr.OcrBlock
 import com.donian.myaitutor.ocr.OcrTextRecognizer
+import com.donian.myaitutor.tutor.LlmInferenceEngine
+import com.donian.myaitutor.tutor.RealGemmaTutorEngine
+import com.donian.myaitutor.tutor.TutorParseResult
+import com.donian.myaitutor.tutor.TutorRequest
+import com.donian.myaitutor.tutor.TutorStreamChunk
+import com.donian.myaitutor.tutor.TutorStreamParser
+import com.donian.myaitutor.tutor.TutorUiState
+import com.donian.myaitutor.tutor.inferenceOptionsFor
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -25,33 +38,51 @@ import java.io.File
  * 홈 화면의 상태와 비즈니스 로직을 소유합니다.
  * Composable은 상태를 구독하고 이벤트를 위임하기만 합니다.
  *
- * [scope]는 외부에서 주입합니다. 프로덕션에서는 Composable의
- * rememberCoroutineScope()를, 테스트에서는 TestScope를 전달합니다.
+ * 추론 요청 생성, 활성 Job, generationId, 취소 처리는 모두 이 ViewModel이 소유합니다.
+ * [scope]는 외부에서 주입합니다. 프로덕션에서는 ViewModelScope를,
+ * 테스트에서는 TestScope를 전달합니다.
+ *
+ * [tutorEngine]은 기존 [GemmaAssistant] 인스턴스를 감싼 어댑터이며,
+ * Engine/Conversation을 새로 만들지 않습니다.
  */
 class HomeViewModel(
     private val appContext: Context,
     private val modelManager: ModelDownloadRepository = ModelDownloadManager(appContext),
-    private val assistant: Assistant = GemmaAssistant(appContext),
+    assistant: Assistant = GemmaAssistant(appContext),
     private val scope: CoroutineScope,
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
     private val enablePolling: Boolean = true,
     private val ocrTextRecognizer: OcrTextRecognizer =
         appContext.applicationContext as OcrTextRecognizer,
     private val ocrLogger: (String) -> Unit = { Log.d(TAG, "OCR 결과:\n$it") },
-    private val stringProvider: StringProvider = StringProvider { resId, args -> appContext.getString(resId, *args) }
+    private val stringProvider: StringProvider = StringProvider { resId, args ->
+        appContext.getString(resId, *args)
+    },
+    private val tutorEngine: LlmInferenceEngine = RealGemmaTutorEngine(assistant)
 ) {
 
     private companion object {
         const val TAG = "HomeViewModel"
+
+        /** 네이티브 취소가 끝났다는 확인을 기다리는 최대 시간. */
+        const val CANCEL_CONFIRM_TIMEOUT_MS = 15_000L
     }
 
-    private val _state = kotlinx.coroutines.flow.MutableStateFlow(
+    private val _state = MutableStateFlow(
         HomeUiState(modelSnapshot = modelManager.snapshot())
     )
-    val state: kotlinx.coroutines.flow.StateFlow<HomeUiState> = _state
+    val state: StateFlow<HomeUiState> = _state
 
     private var generationJob: Job? = null
     private var generationId = 0
+
+    /** 사용자가 중단을 요청한 generationId. 정상 오류와 취소를 구분합니다. */
+    private var userCancelledGeneration: Int? = null
+
+    /** 후속 질문 요청에 사용할 마지막 과목. 과목 상태 자체는 화면이 소유합니다. */
+    private var lastSubject: String = ""
+
+    private val tutorParser = TutorStreamParser()
 
     init {
         if (enablePolling) {
@@ -66,7 +97,8 @@ class HomeViewModel(
                     _state.value = _state.value.copy(modelSnapshot = snapshot)
                     val busy = snapshot.status == ModelDownloadStatus.DOWNLOADING ||
                         snapshot.status == ModelDownloadStatus.QUEUED ||
-                        snapshot.status == ModelDownloadStatus.PAUSED
+                        snapshot.status == ModelDownloadStatus.PAUSED ||
+                        snapshot.status == ModelDownloadStatus.VERIFYING
                     delay(if (busy) 1_000L else 5_000L)
                 }
             }
@@ -77,8 +109,12 @@ class HomeViewModel(
      * 앱/화면 종료 시 엔진 자원을 해제합니다. scope 자체는 소유자가 관리합니다.
      */
     fun close() {
+        generationId++
+        userCancelledGeneration = null
+        tutorEngine.cancelGeneration()
         generationJob?.cancel()
-        scope.launch { runCatching { assistant.release() } }
+        generationJob = null
+        scope.launch { runCatching { tutorEngine.release() } }
     }
 
     fun onInputChange(text: String) {
@@ -93,25 +129,65 @@ class HomeViewModel(
         _state.value = _state.value.copy(statusMessage = message)
     }
 
+    /** 학년 변경은 기존 HomeViewModel 메서드로 처리하고 HomeUiState에 단일 저장합니다. */
+    fun selectGrade(grade: TutorGrade) {
+        _state.value = _state.value.copy(selectedGrade = grade)
+    }
+
     fun resetForNewSubject() {
+        // 진행 중인 추론이 있으면 네이티브 취소까지 요청합니다.
+        if (_state.value.isAnalyzing) {
+            tutorEngine.cancelGeneration()
+        }
+        generationJob?.cancel()
+        generationJob = null
+        generationId++
+        userCancelledGeneration = null
+        tutorParser.reset()
+        // 이전 캡처 이미지는 삭제 (과목 변경 시)
+        _state.value.capturedImage?.let { file ->
+            runCatching { if (file.exists()) file.delete() }
+        }
         _state.value = _state.value.copy(
             capturedImage = null,
+            cameraCapturedImage = null,
             answer = "",
             inputText = "",
             analysisStage = null,
             ocrText = "",
+            ocrBlocks = emptyList(),
             showFollowUpChoices = false,
-            statusMessage = null
+            statusMessage = null,
+            isAnalyzing = false,
+            tutorState = TutorUiState()
         )
     }
 
     fun confirmCapture(image: File) {
+        if (_state.value.isAnalyzing) {
+            tutorEngine.cancelGeneration()
+            generationJob?.cancel()
+            generationJob = null
+            generationId++
+            userCancelledGeneration = null
+        }
+        tutorParser.reset()
+        // 이전 캡처 이미지가 있으면 삭제 (새 사진으로 교체)
+        _state.value.capturedImage?.let { oldImage ->
+            if (oldImage != image) {
+                runCatching { if (oldImage.exists()) oldImage.delete() }
+            }
+        }
         _state.value = _state.value.copy(
             capturedImage = image,
             cameraCapturedImage = null,
             cameraError = null,
             analysisStage = null,
-            ocrText = ""
+            ocrText = "",
+            ocrBlocks = emptyList(),
+            answer = "",
+            showFollowUpChoices = false,
+            tutorState = TutorUiState()
         )
     }
 
@@ -124,19 +200,36 @@ class HomeViewModel(
     }
 
     fun clearCameraCapturedImage() {
+        _state.value.cameraCapturedImage?.let { file ->
+            runCatching { if (file.exists()) file.delete() }
+        }
         _state.value = _state.value.copy(cameraCapturedImage = null, cameraError = null)
     }
 
     fun analyzeImage(image: File, subject: String, selection: ImageSelection? = null) {
         if (_state.value.isAnalyzing) return
+        if (_state.value.tutorState.requiresRecovery) {
+            _state.value = _state.value.copy(
+                statusMessage = _state.value.tutorState.errorMessage
+            )
+            return
+        }
+
+        lastSubject = subject
         val currentGeneration = ++generationId
+        userCancelledGeneration = null
+        tutorParser.reset()
+        val initialTutorState = tutorParser.startOcr()
+
         _state.value = _state.value.copy(
             isAnalyzing = true,
             answer = "",
             analysisStage = ImageAnalysisStage.OCR,
             ocrText = "",
+            ocrBlocks = emptyList(),
             showFollowUpChoices = false,
-            statusMessage = null
+            statusMessage = null,
+            tutorState = initialTutorState
         )
         generationJob = scope.launch {
             var completed = false
@@ -155,65 +248,100 @@ class HomeViewModel(
                     }
                     imageToAnalyze = normalizedImage ?: image
                 }
-                val ocrText = ocrTextRecognizer.recognize(imageToAnalyze).joinToString("\n")
+                val ocrBlocks = ocrTextRecognizer.recognize(imageToAnalyze)
                 // TODO: OCR 결과 텍스트의 Logcat 출력을 디버깅 종료 후 제거하세요.
+                val ocrText = formatOcrBlocksForPrompt(ocrBlocks)
                 ocrLogger(ocrText)
                 if (ocrText.isBlank()) {
                     if (currentGeneration == generationId) {
+                        val message = stringProvider.get(R.string.status_ocr_empty)
+                        val tutorState = tutorParser.onChunk(TutorStreamChunk.Error(message)).state
                         _state.value = _state.value.copy(
-                            answer = stringProvider.get(R.string.status_ocr_empty)
+                            answer = message,
+                            tutorState = tutorState
                         )
                     }
                     return@launch
                 }
+
+                // OCR 신뢰도 탐지: 평균 신뢰도가 낮거나(0.6 미만) 매우 낮은 블록(0.4 미만)이 존재하는 경우 안내 메시지 설정
+                val validConfidences = ocrBlocks.mapNotNull { it.confidence }
+                val avgConfidence = if (validConfidences.isNotEmpty()) validConfidences.average() else 1.0
+                val isLowConfidence =
+                    validConfidences.isNotEmpty() && (avgConfidence < 0.6 || validConfidences.any { it < 0.4f })
+
                 if (currentGeneration == generationId) {
                     _state.value = _state.value.copy(
                         ocrText = ocrText,
-                        analysisStage = ImageAnalysisStage.GEMMA
+                        ocrBlocks = ocrBlocks,
+                        analysisStage = ImageAnalysisStage.GEMMA,
+                        statusMessage = if (isLowConfidence) {
+                            stringProvider.get(R.string.status_ocr_low_confidence)
+                        } else null,
+                        tutorState = tutorParser.onOcrCompleted()
                     )
                 }
-                assistant.analyzeImage(ocrText, subject) { newText ->
-                    if (currentGeneration == generationId) {
-                        _state.value = _state.value.copy(answer = newText)
-                        receivedAnswer = newText.isNotBlank()
-                    }
-                }
+
+                val grade = _state.value.selectedGrade
+                val request = TutorRequest(
+                    text = ocrText,
+                    subject = subject,
+                    grade = grade,
+                    options = inferenceOptionsFor(grade, isFollowUp = false)
+                )
                 if (currentGeneration == generationId) {
-                    val label = assistant.backendLabel()
-                    _state.value = _state.value.copy(backendLabel = stringProvider.get(R.string.backend_label, label))
-                    completed = true
-                    if (!receivedAnswer) {
+                    _state.value = _state.value.copy(tutorState = tutorParser.onAnalysisStarted())
+                }
+                receivedAnswer = collectTutorStream(request, currentGeneration)
+
+                if (currentGeneration == generationId) {
+                    val label = tutorEngine.backendLabel()
+                    _state.value = _state.value.copy(
+                        backendLabel = stringProvider.get(R.string.backend_label, label)
+                    )
+                    val tutorState = _state.value.tutorState
+                    completed = tutorState.isCompleted && receivedAnswer
+                    if (!receivedAnswer && !tutorState.isCancelled && tutorState.errorMessage == null) {
                         _state.value = _state.value.copy(
                             answer = stringProvider.get(R.string.status_answer_empty_image),
                             statusMessage = stringProvider.get(R.string.status_analysis_empty)
                         )
                     }
                 }
-            } catch (error: kotlinx.coroutines.CancellationException) {
+            } catch (error: CancellationException) {
+                if (currentGeneration == generationId) {
+                    val tutorState = if (userCancelledGeneration == currentGeneration) {
+                        tutorParser.onCancellationConfirmed()
+                    } else {
+                        _state.value.tutorState
+                    }
+                    _state.value = _state.value.copy(tutorState = tutorState)
+                }
                 throw error
             } catch (error: Exception) {
                 if (currentGeneration == generationId) {
+                    val message = error.localizedMessage
+                        ?: stringProvider.get(R.string.status_analysis_error)
                     _state.value = _state.value.copy(
-                        statusMessage = error.localizedMessage ?: stringProvider.get(R.string.status_analysis_error)
+                        tutorState = tutorParser.onChunk(TutorStreamChunk.Error(message)).state
                     )
                 }
             } finally {
-                runCatching { if (image.exists()) image.delete() }
+                // 1) 원본 촬영 이미지는 재분석을 위해 보존
+                // 2) 임시 파일만 정리 (전처리, 크롭 결과)
                 if (normalizedImage != null && normalizedImage != image) {
                     runCatching { if (normalizedImage.exists()) normalizedImage.delete() }
                 }
                 if (imageToAnalyze != image && imageToAnalyze != normalizedImage) {
                     runCatching { if (imageToAnalyze.exists()) imageToAnalyze.delete() }
                 }
+                // 3) UI 상태 복구를 부가 작업보다 먼저 보장
                 if (currentGeneration == generationId) {
-                    val tokens = assistant.getTokenCount()
-                    _state.value = _state.value.copy(
-                        isAnalyzing = false,
-                        analysisStage = null,
-                        showFollowUpChoices = completed && receivedAnswer,
-                        tokenCount = tokens
+                    recoverUiAfterGeneration(
+                        completed = completed,
+                        receivedAnswer = receivedAnswer,
+                        showChoicesAfterResponse = true
                     )
-                    generationJob = null
                 }
             }
         }
@@ -221,67 +349,214 @@ class HomeViewModel(
 
     fun sendQuestion(question: String, showChoicesAfterResponse: Boolean = false) {
         if (question.isBlank() || _state.value.isAnalyzing) return
+        if (_state.value.tutorState.requiresRecovery) {
+            _state.value = _state.value.copy(
+                statusMessage = _state.value.tutorState.errorMessage
+            )
+            return
+        }
         if (_state.value.modelSnapshot.status != ModelDownloadStatus.READY) {
             _state.value = _state.value.copy(
                 statusMessage = stringProvider.get(R.string.status_model_required)
             )
             return
         }
+
         val currentGeneration = ++generationId
+        userCancelledGeneration = null
+        tutorParser.reset()
         val previousAnswer = _state.value.answer
-        val pendingAnswer = com.donian.myaitutor.ai.followUpAnswerPrefix(previousAnswer, question)
+        val pendingAnswer = followUpAnswerPrefix(previousAnswer, question)
         _state.value = _state.value.copy(
             isAnalyzing = true,
             answer = pendingAnswer,
             showFollowUpChoices = false,
             inputText = "",
-            statusMessage = null
+            statusMessage = null,
+            analysisStage = null,
+            tutorState = tutorParser.startFollowUp()
         )
         generationJob = scope.launch {
             var completed = false
             var receivedAnswer = false
             try {
-                assistant.askFollowUp(question) { newText ->
-                    if (currentGeneration == generationId) {
-                        _state.value = _state.value.copy(answer = pendingAnswer + newText)
-                        receivedAnswer = newText.isNotBlank()
-                    }
-                }
+                val grade = _state.value.selectedGrade
+                val request = TutorRequest(
+                    text = question,
+                    subject = lastSubject.ifBlank { "기타" },
+                    grade = grade,
+                    options = inferenceOptionsFor(grade, isFollowUp = true)
+                )
+                _state.value = _state.value.copy(tutorState = tutorParser.onAnalysisStarted())
+                receivedAnswer = collectTutorStream(request, currentGeneration)
+
                 if (currentGeneration == generationId) {
-                    val label = assistant.backendLabel()
-                    _state.value = _state.value.copy(backendLabel = stringProvider.get(R.string.backend_label, label))
-                    completed = true
-                    if (!receivedAnswer) {
+                    val label = tutorEngine.backendLabel()
+                    _state.value = _state.value.copy(
+                        backendLabel = stringProvider.get(R.string.backend_label, label)
+                    )
+                    val tutorState = _state.value.tutorState
+                    completed = tutorState.isCompleted && receivedAnswer
+                    if (!receivedAnswer && !tutorState.isCancelled && tutorState.errorMessage == null) {
                         _state.value = _state.value.copy(
                             statusMessage = stringProvider.get(R.string.status_answer_empty_followup)
                         )
                     }
                 }
-            } catch (error: kotlinx.coroutines.CancellationException) {
+            } catch (error: CancellationException) {
+                if (currentGeneration == generationId) {
+                    val tutorState = if (userCancelledGeneration == currentGeneration) {
+                        tutorParser.onCancellationConfirmed()
+                    } else {
+                        _state.value.tutorState
+                    }
+                    _state.value = _state.value.copy(tutorState = tutorState)
+                }
                 throw error
             } catch (error: Exception) {
                 if (currentGeneration == generationId) {
+                    val message = error.localizedMessage
+                        ?: stringProvider.get(R.string.status_question_error)
                     _state.value = _state.value.copy(
-                        statusMessage = error.localizedMessage ?: stringProvider.get(R.string.status_question_error)
+                        tutorState = tutorParser.onChunk(TutorStreamChunk.Error(message)).state
                     )
                 }
             } finally {
                 if (currentGeneration == generationId) {
-                    val tokens = assistant.getTokenCount()
-                    _state.value = _state.value.copy(
-                        isAnalyzing = false,
-                        showFollowUpChoices = completed && receivedAnswer && showChoicesAfterResponse,
-                        tokenCount = tokens
+                    recoverUiAfterGeneration(
+                        completed = completed,
+                        receivedAnswer = receivedAnswer,
+                        showChoicesAfterResponse = showChoicesAfterResponse
                     )
-                    generationJob = null
                 }
             }
         }
     }
 
+    /**
+     * 튜터 스트림을 수집합니다. 답변 증가분은 즉시 HomeUiState.answer에만 이어 붙입니다.
+     * @return 실제 답변 조각을 하나라도 받았는지 여부
+     */
+    private suspend fun collectTutorStream(
+        request: TutorRequest,
+        currentGeneration: Int
+    ): Boolean {
+        var receivedAnswer = false
+        tutorEngine.stream(request).collect { chunk ->
+            if (currentGeneration != generationId) return@collect
+            val result = tutorParser.onChunk(chunk)
+            applyTutorResult(result)
+            if (!result.answerTextDelta.isNullOrEmpty()) {
+                receivedAnswer = true
+            }
+        }
+        if (currentGeneration == generationId && !tutorParser.state().isTerminal) {
+            val endResult = tutorParser.onStreamEnded()
+            applyTutorResult(endResult)
+            if (!endResult.answerTextDelta.isNullOrEmpty()) receivedAnswer = true
+        }
+        return receivedAnswer
+    }
+
+    /** 파서 결과를 HomeUiState.answer와 tutorState에 원자적으로 합성합니다. */
+    private fun applyTutorResult(result: TutorParseResult) {
+        val current = _state.value
+        val delta = result.answerTextDelta
+        _state.value = current.copy(
+            answer = if (delta.isNullOrEmpty()) current.answer else current.answer + delta,
+            tutorState = result.state
+        )
+    }
+
+    /** 생성 종료 후 UI 복구. 토큰 조회 실패가 상태 복구를 막지 않습니다. */
+    private suspend fun recoverUiAfterGeneration(
+        completed: Boolean,
+        receivedAnswer: Boolean,
+        showChoicesAfterResponse: Boolean
+    ) {
+        val tokens = try {
+            tutorEngine.getTokenCount()
+        } catch (_: Exception) {
+            0
+        }
+        var tutorState = _state.value.tutorState
+        tutorState = when {
+            userCancelledGeneration == generationId && !tutorState.isCancelled ->
+                tutorParser.onCancellationConfirmed()
+            tutorState.isGenerating -> tutorParser.onStreamEnded().state
+            else -> tutorState
+        }
+        _state.value = _state.value.copy(
+            isAnalyzing = false,
+            analysisStage = null,
+            showFollowUpChoices = completed && receivedAnswer && showChoicesAfterResponse,
+            tokenCount = tokens,
+            tutorState = tutorState
+        )
+        generationJob = null
+    }
+
+    /**
+     * 사용자 중단. 네이티브 취소 완료를 확인한 뒤에만 수집 Job을 정리합니다.
+     * 완료를 확인하지 못하면 새 추론을 금지하고 복구 상태로 전환합니다.
+     */
     fun cancelGeneration() {
-        generationJob?.cancel()
-        assistant.cancelGeneration()
+        val job = generationJob ?: return
+        if (!_state.value.isAnalyzing) return
+        val currentGeneration = generationId
+        if (userCancelledGeneration == currentGeneration) return
+
+        userCancelledGeneration = currentGeneration
+        _state.value = _state.value.copy(
+            tutorState = tutorParser.onCancellationRequested()
+        )
+        tutorEngine.cancelGeneration()
+
+        scope.launch {
+            val confirmed = tutorEngine.awaitGenerationStopped(CANCEL_CONFIRM_TIMEOUT_MS)
+            if (currentGeneration != generationId) return@launch
+            if (confirmed) {
+                // finally가 취소 상태와 isAnalyzing=false를 복구합니다.
+                job.cancel()
+            } else {
+                // 안전하지 않은 상태에서는 다음 추론을 시작하지 않습니다.
+                generationId++
+                job.cancel()
+                _state.value = _state.value.copy(
+                    isAnalyzing = false,
+                    analysisStage = null,
+                    statusMessage = null,
+                    tutorState = tutorParser.onCancellationUnconfirmed()
+                )
+                generationJob = null
+            }
+        }
+    }
+
+    /** 취소 완료를 확인하지 못한 상태에서 Conversation만 안전하게 교체합니다. */
+    fun recoverTutor() {
+        scope.launch {
+            if (_state.value.isAnalyzing) {
+                tutorEngine.cancelGeneration()
+                generationJob?.cancel()
+                generationJob = null
+            }
+            generationId++
+            userCancelledGeneration = null
+            var failureMessage: String? = null
+            try {
+                tutorEngine.resetConversation()
+            } catch (error: Exception) {
+                failureMessage = error.localizedMessage
+            }
+            tutorParser.reset()
+            _state.value = _state.value.copy(
+                isAnalyzing = false,
+                analysisStage = null,
+                statusMessage = failureMessage,
+                tutorState = TutorUiState()
+            )
+        }
     }
 
     fun startDownload() {
@@ -301,7 +576,7 @@ class HomeViewModel(
 
     fun deleteModel() {
         scope.launch {
-            assistant.release()
+            tutorEngine.release()
             modelManager.deleteModel()
             _state.value = _state.value.copy(
                 modelSnapshot = modelManager.snapshot(),
@@ -313,16 +588,20 @@ class HomeViewModel(
     fun preWarmIfNeeded() {
         scope.launch {
             if (_state.value.modelSnapshot.status == ModelDownloadStatus.READY) {
-                runCatching { assistant.preWarm() }
+                runCatching { tutorEngine.preWarm() }
                     .onFailure { error ->
                         _state.value = _state.value.copy(
                             statusMessage = error.localizedMessage
                                 ?: stringProvider.get(R.string.status_model_prewarm_failed)
                         )
                     }
-                _state.value = _state.value.copy(backendLabel = stringProvider.get(R.string.backend_label, assistant.backendLabel()))
+                _state.value = _state.value.copy(
+                    backendLabel = stringProvider.get(
+                        R.string.backend_label,
+                        tutorEngine.backendLabel()
+                    )
+                )
             }
-
         }
     }
 
@@ -346,5 +625,38 @@ class HomeViewModel(
                 }
             )
         }
+    }
+
+    /**
+     * OCR 블록을 Gemma에 전달할 텍스트로 포맷팅합니다.
+     * 블록의 위치, 신뢰도, 유형 정보를 활용해 구조화된 텍스트를 만듭니다.
+     */
+    private fun formatOcrBlocksForPrompt(blocks: List<OcrBlock>): String {
+        if (blocks.isEmpty()) return ""
+        return blocks.map { block ->
+            when (block.type) {
+                OcrBlock.OcrBlockType.FORMULA -> {
+                    // 수식은 별도 표시로 구분
+                    "[수식] ${block.text.trim()}"
+                }
+                OcrBlock.OcrBlockType.TABLE -> {
+                    // 표 구조 보존을 위해 [표] 태그 부여
+                    val text = block.text.trim()
+                    if (text.startsWith("[표]")) text else "[표]\n$text"
+                }
+                OcrBlock.OcrBlockType.IMAGE -> {
+                    // 이미지 설명은 [이미지] 태그로 표시
+                    "[이미지] ${block.text.trim()}"
+                }
+                OcrBlock.OcrBlockType.TEXT -> {
+                    // 일반 텍스트는 그대로
+                    block.text.trim()
+                }
+                else -> {
+                    // 알 수 없거나 다른 유형은 그대로
+                    block.text.trim()
+                }
+            }
+        }.joinToString("\n")
     }
 }

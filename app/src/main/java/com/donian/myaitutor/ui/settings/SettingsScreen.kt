@@ -60,9 +60,6 @@ import com.donian.myaitutor.ui.components.InfoCard
 internal fun SettingsScreen(
     snapshot: ModelDownloadSnapshot,
     backendLabel: String,
-    tokenCount: Int,
-    maxContextTokens: Int,
-    maxOutputTokens: Int,
     onBack: () -> Unit,
     onDownload: () -> Unit,
     onDeleteModel: () -> Unit,
@@ -71,7 +68,9 @@ internal fun SettingsScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showLicensesDialog by remember { mutableStateOf(false) }
     val isBusy = snapshot.status == ModelDownloadStatus.DOWNLOADING ||
-        snapshot.status == ModelDownloadStatus.QUEUED || snapshot.status == ModelDownloadStatus.PAUSED
+        snapshot.status == ModelDownloadStatus.QUEUED ||
+        snapshot.status == ModelDownloadStatus.PAUSED ||
+        snapshot.status == ModelDownloadStatus.VERIFYING
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -117,6 +116,7 @@ internal fun SettingsScreen(
                                 ModelDownloadStatus.DOWNLOADING -> stringResource(R.string.model_status_downloading)
                                 ModelDownloadStatus.QUEUED -> stringResource(R.string.model_status_queued)
                                 ModelDownloadStatus.PAUSED -> stringResource(R.string.model_status_paused)
+                                ModelDownloadStatus.VERIFYING -> stringResource(R.string.model_status_verifying)
                                 ModelDownloadStatus.FAILED -> stringResource(R.string.model_status_failed)
                                 ModelDownloadStatus.NOT_INSTALLED -> stringResource(R.string.model_status_not_installed)
                             },
@@ -208,7 +208,6 @@ internal fun SettingsScreen(
             Text("나만의 AI쌤 0.0.1 · Gemma 4 E4B-IT LiteRT-LM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(R.string.settings_runtime_env), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(R.string.settings_current_backend, backendLabel), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(stringResource(R.string.settings_token_usage, tokenCount, maxContextTokens, maxOutputTokens), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 

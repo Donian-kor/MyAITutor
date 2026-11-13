@@ -34,8 +34,18 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
         val completedPreviously = preferences.getBoolean(KEY_COMPLETED, false)
 
         if (completedPreviously && modelFile.isFile && modelFile.length() >= MIN_MODEL_BYTES) {
-            if (EXPECTED_MODEL_SHA256.isNotEmpty() && preferences.getBoolean(KEY_HASH_MISMATCH, false)) {
-                return failedSnapshot(appContext.getString(R.string.dl_msg_hash_mismatch))
+            if (EXPECTED_MODEL_SHA256.isNotEmpty()) {
+                if (preferences.getBoolean(KEY_HASH_MISMATCH, false)) {
+                    return failedSnapshot(appContext.getString(R.string.dl_msg_hash_mismatch))
+                }
+                if (!preferences.getBoolean(KEY_HASH_VERIFIED, false)) {
+                    return ModelDownloadSnapshot(
+                        status = ModelDownloadStatus.VERIFYING,
+                        downloadedBytes = modelFile.length(),
+                        totalBytes = EXPECTED_MODEL_BYTES,
+                        message = appContext.getString(R.string.dl_msg_verifying)
+                    )
+                }
             }
             return ModelDownloadSnapshot(
                 status = ModelDownloadStatus.READY,
@@ -79,10 +89,20 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
                 )
                 DownloadManager.STATUS_SUCCESSFUL -> {
                     if (modelFile.isFile && modelFile.length() >= MIN_MODEL_BYTES) {
-                        if (EXPECTED_MODEL_SHA256.isNotEmpty() && preferences.getBoolean(KEY_HASH_MISMATCH, false)) {
-                            return failedSnapshot(appContext.getString(R.string.dl_msg_hash_mismatch))
-                        }
                         preferences.edit { putBoolean(KEY_COMPLETED, true) }
+                        if (EXPECTED_MODEL_SHA256.isNotEmpty()) {
+                            if (preferences.getBoolean(KEY_HASH_MISMATCH, false)) {
+                                return failedSnapshot(appContext.getString(R.string.dl_msg_hash_mismatch))
+                            }
+                            if (!preferences.getBoolean(KEY_HASH_VERIFIED, false)) {
+                                return ModelDownloadSnapshot(
+                                    status = ModelDownloadStatus.VERIFYING,
+                                    downloadedBytes = modelFile.length(),
+                                    totalBytes = if (total > 0L) total else EXPECTED_MODEL_BYTES,
+                                    message = appContext.getString(R.string.dl_msg_verifying)
+                                )
+                            }
+                        }
                         ModelDownloadSnapshot(
                             ModelDownloadStatus.READY,
                             modelFile.length(),
@@ -115,7 +135,11 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
             runCatching { downloadManager.remove(existingId) }
         }
         modelFile.delete()
-        preferences.edit { putBoolean(KEY_COMPLETED, false) }
+        preferences.edit {
+            putBoolean(KEY_COMPLETED, false)
+            putBoolean(KEY_HASH_VERIFIED, false)
+            putBoolean(KEY_HASH_MISMATCH, false)
+        }
 
         val request = DownloadManager.Request(MODEL_DOWNLOAD_URL.toUri())
             .setTitle(appContext.getString(R.string.dl_notification_title))
@@ -151,10 +175,12 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
 
     /**
      * 해시 검증이 필요한지 여부. EXPECTED_MODEL_SHA256이 비어 있으면 검증을 건너뜁니다.
+     * 다운로드 상태가 STATUS_SUCCESSFUL (KEY_COMPLETED == true) 일 때만 검증을 진행합니다.
      */
     override fun needsHashVerification(): Boolean {
         if (EXPECTED_MODEL_SHA256.isEmpty()) return false
         if (!modelFile.isFile || modelFile.length() < MIN_MODEL_BYTES) return false
+        if (!preferences.getBoolean(KEY_COMPLETED, false)) return false
         if (preferences.getBoolean(KEY_HASH_VERIFIED, false)) return false
         if (preferences.getBoolean(KEY_HASH_MISMATCH, false)) return false
         return true
@@ -197,7 +223,7 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
 
     companion object {
         const val MODEL_DOWNLOAD_URL =
-            "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm?download=true"
+            "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/23d467f654b9d0b6eb8b1e4f4544d036329007e0/gemma-4-E4B-it.litertlm?download=true"
         const val MODEL_FILE_NAME = "gemma-4-E4B-it.litertlm"
         const val EXPECTED_MODEL_BYTES = 3_659_530_240L
         // 모델 파일의 SHA-256 (소문자 hex). 비어 있으면 해시 검증을 건너뜁니다.
@@ -216,6 +242,7 @@ enum class ModelDownloadStatus {
     QUEUED,
     DOWNLOADING,
     PAUSED,
+    VERIFYING,
     READY,
     FAILED
 }
