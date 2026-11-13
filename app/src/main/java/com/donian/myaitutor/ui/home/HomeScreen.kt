@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,6 +59,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.donian.myaitutor.R
 import com.donian.myaitutor.ai.TutorGrade
@@ -67,12 +69,12 @@ import com.donian.myaitutor.ui.components.TeacherAvatar
 import java.io.File
 
 /**
- * 메인(홈) 화면 - 개선된 디자인.
+ * 메인(홈) 화면 - 반응형 개선 디자인.
  *
- * 변경 사항:
- * - 과목 선택: 드롭다운 박스로 변경
- * - 학년 칩: 상단 헤더 카드와 채팅 카드 사이로 이동
- * - AI 답변/학생 질문 분리 표시
+ * 구조:
+ * - 헤더 카드: 아바타 + 문제풀이 제목 + 토큰 수 + 설정/로딩
+ * - 과목/학년 라인: 학년 칩(좌측) + 과목 드롭다운(우측)
+ * - 대화 카드: 채팅 영역
  */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
@@ -128,7 +130,7 @@ internal fun HomeScreen(
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .imePadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     val compact = maxWidth < 360.dp
                     ComposerBar(
@@ -151,10 +153,10 @@ internal fun HomeScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // 상단 헤더 카드
+            // === 상단 헤더 카드 ===
             AnimatedVisibility(
                 visible = headerVisible,
                 enter = fadeIn(animationSpec = tween(500)) + slideInVertically(
@@ -171,43 +173,152 @@ internal fun HomeScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // 과목 선택 드롭다운
+                        // AI 선생님 아바타 (앱 아이콘)
+                        TeacherAvatar(size = 44)
+
+                        // 문제 풀이 제목 + 토큰 수
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                when (analysisStage) {
+                                    ImageAnalysisStage.OCR -> stringResource(R.string.home_stage_ocr)
+                                    ImageAnalysisStage.GEMMA -> stringResource(R.string.home_stage_gemma)
+                                    null -> if (isAnalyzing) {
+                                        stringResource(R.string.home_stage_gemma)
+                                    } else {
+                                        stringResource(R.string.home_title_generator)
+                                    }
+                                },
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = colors.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (tokenCount > 0) {
+                                Spacer(Modifier.height(3.dp))
+                                Surface(
+                                    shape = shapes.small,
+                                    color = colors.surfaceVariant
+                                ) {
+                                    Text(
+                                        text = "$tokenCount / $maxContextTokens 토큰",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = colors.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // 앱 로딩 원형 아이콘 또는 설정 버튼
+                        if (isAnalyzing || analysisStage != null) {
+                            // 분석/로딩 중: 앱 로딩 원형 인디케이터
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(40.dp),
+                                strokeWidth = 4.dp,
+                                color = colors.primary
+                            )
+                        } else {
+                            Surface(
+                                shape = shapes.medium,
+                                color = colors.surfaceVariant,
+                                modifier = Modifier.size(42.dp)
+                            ) {
+                                IconButton(onClick = onOpenSettings) {
+                                    Icon(
+                                        Icons.Default.Settings,
+                                        contentDescription = stringResource(R.string.content_desc_open_settings),
+                                        tint = colors.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // === 과목 드롭다운 + 학년 칩 라인 ===
+            AnimatedVisibility(
+                visible = headerVisible,
+                enter = fadeIn(animationSpec = tween(500, delayMillis = 100)),
+            ) {
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val isCompact = maxWidth < 400.dp
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // 학년 칩 (좌측, 스크롤 가능)
+                        LazyRow(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            items(TutorGrade.entries) { grade ->
+                                val selected = grade == selectedGrade
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { onGradeSelected(grade) },
+                                    label = {
+                                        Text(
+                                            grade.label,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            maxLines = 1
+                                        )
+                                    },
+                                    leadingIcon = if (selected && !isCompact) {
+                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                    } else null,
+                                    shape = shapes.large,
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = colors.primary,
+                                        selectedLabelColor = colors.onPrimary,
+                                        selectedLeadingIconColor = colors.onPrimary,
+                                        containerColor = colors.surfaceVariant,
+                                        labelColor = colors.onSurfaceVariant
+                                    )
+                                )
+                            }
+                        }
+
+                        // 과목 선택 드롭다운 (우측)
                         Box {
                             Surface(
                                 shape = shapes.medium,
-                                color = colors.primaryContainer,
-                                modifier = Modifier
+                                color = colors.primaryContainer
                             ) {
                                 Row(
                                     modifier = Modifier
-                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                        .clickable { subjectDropdownExpanded = true }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Text(
                                         selectedSubject,
-                                        style = MaterialTheme.typography.titleSmall,
+                                        style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.Bold,
-                                        color = colors.onPrimaryContainer
+                                        color = colors.onPrimaryContainer,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     Icon(
                                         Icons.Default.ArrowDropDown,
                                         contentDescription = "과목 선택",
                                         tint = colors.onPrimaryContainer,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
-                            // 클릭 영역
-                            Box(
-                                modifier = Modifier
-                                    .matchParentSize()
-                                    .clickable { subjectDropdownExpanded = true }
-                            )
                             DropdownMenu(
                                 expanded = subjectDropdownExpanded,
                                 onDismissRequest = { subjectDropdownExpanded = false }
@@ -232,107 +343,11 @@ internal fun HomeScreen(
                                 }
                             }
                         }
-
-                        Spacer(Modifier.weight(1f))
-
-                        // 문제 풀이 제목
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                when (analysisStage) {
-                                    ImageAnalysisStage.OCR -> stringResource(R.string.home_stage_ocr)
-                                    ImageAnalysisStage.GEMMA -> stringResource(R.string.home_stage_gemma)
-                                    null -> if (isAnalyzing) {
-                                        stringResource(R.string.home_stage_gemma)
-                                    } else {
-                                        stringResource(R.string.home_title_generator)
-                                    }
-                                },
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = colors.onSurface
-                            )
-                            if (tokenCount > 0) {
-                                Spacer(Modifier.height(4.dp))
-                                Surface(
-                                    shape = shapes.small,
-                                    color = colors.surfaceVariant
-                                ) {
-                                    Text(
-                                        text = "$tokenCount / $maxContextTokens 토큰",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = colors.onSurfaceVariant,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        // 설정 버튼 또는 로딩 인디케이터
-                        if (isAnalyzing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(32.dp),
-                                strokeWidth = 3.dp,
-                                color = colors.primary
-                            )
-                        } else {
-                            Surface(
-                                shape = shapes.medium,
-                                color = colors.surfaceVariant,
-                                modifier = Modifier.size(44.dp)
-                            ) {
-                                IconButton(onClick = onOpenSettings) {
-                                    Icon(
-                                        Icons.Default.Settings,
-                                        contentDescription = stringResource(R.string.content_desc_open_settings),
-                                        tint = colors.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
             }
 
-            // 학년 선택 칩 - 헤더 카드와 채팅 카드 사이
-            AnimatedVisibility(
-                visible = headerVisible,
-                enter = fadeIn(animationSpec = tween(500, delayMillis = 100)),
-            ) {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    contentPadding = PaddingValues(horizontal = 2.dp)
-                ) {
-                    items(TutorGrade.entries) { grade ->
-                        val selected = grade == selectedGrade
-                        FilterChip(
-                            selected = selected,
-                            onClick = { onGradeSelected(grade) },
-                            label = {
-                                Text(
-                                    grade.label,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            },
-                            leadingIcon = if (selected) {
-                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                            } else null,
-                            shape = shapes.large,
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = colors.primary,
-                                selectedLabelColor = colors.onPrimary,
-                                selectedLeadingIconColor = colors.onPrimary,
-                                containerColor = colors.surfaceVariant,
-                                labelColor = colors.onSurfaceVariant
-                            )
-                        )
-                    }
-                }
-            }
-
-            // 대화 영역 카드
+            // === 대화 영역 카드 ===
             AnimatedVisibility(
                 visible = headerVisible,
                 enter = fadeIn(animationSpec = tween(600, delayMillis = 200)),
@@ -350,13 +365,8 @@ internal fun HomeScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(20.dp)
+                            .padding(16.dp)
                     ) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(bottom = 12.dp),
-                            color = colors.outlineVariant
-                        )
-
                         // 튜터 결과 영역
                         TutorResultScreen(
                             answer = answer,

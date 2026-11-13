@@ -123,7 +123,7 @@ fun TeacherMessageBubble(
 
 /**
  * 사용자 메시지 버블 - 개선된 디자인.
- * AI 답변과 배경색으로 명확히 구분.
+ * AI 답변과 배경색으로 명확히 구분 (연한 그린 계열).
  */
 @Composable
 fun UserMessageBubble(
@@ -142,7 +142,7 @@ fun UserMessageBubble(
                 bottomStart = 18.dp,
                 bottomEnd = 18.dp
             ),
-            color = MaterialTheme.colorScheme.primaryContainer,
+            color = MaterialTheme.colorScheme.tertiaryContainer,
             shadowElevation = 1.dp,
             modifier = Modifier.weight(1f, fill = false)
         ) {

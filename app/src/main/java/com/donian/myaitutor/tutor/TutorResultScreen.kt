@@ -142,7 +142,7 @@ internal fun TutorResultScreen(
                 .weight(1f)
                 .fillMaxWidth()
                 .verticalScroll(answerScrollState),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (ocrText.isNotBlank() || preprocessedImage != null) {
                 OcrTextDisclosure(text = ocrText, imageFile = preprocessedImage)
@@ -167,7 +167,7 @@ internal fun TutorResultScreen(
                                 Text(
                                     text = message.text,
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer
                                 )
                             }
                         }
