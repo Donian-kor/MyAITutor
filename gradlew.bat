@@ -1,6 +1,6 @@
 @echo off
 setlocal
-set GRADLE_VERSION=9.3.1
+set GRADLE_VERSION=9.6.0
 set GRADLE_HOME=%USERPROFILE%\.gradle\focus-ai-bootstrap\gradle-%GRADLE_VERSION%
 if not exist "%GRADLE_HOME%\bin\gradle.bat" (
   echo [MyAITutor] Gradle %GRADLE_VERSION% is not installed. Downloading it now...
