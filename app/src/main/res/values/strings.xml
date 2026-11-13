@@ -145,7 +145,7 @@
     <string name="dl_notification_desc">Gemma 4 E4B-IT · 약 3.66GB · Wi-Fi 전용</string>
 
     <!-- 시작 로딩 화면 -->
-    <string name="loading_title">선생님이 수업을 준비중이에요.</string>
+    <string name="loading_title">나만의 AI쌤이 수업을 준비중이에요.</string>
     <string name="loading_desc_download_required">AI 모델을 설치하면 바로 문제 풀이를 시작할 수 있어요.</string>
     <string name="loading_desc_downloading">AI 모델을 다운로드하고 있어요. Wi-Fi 연결을 확인해 주세요.</string>
     <string name="loading_desc_verifying">내려받은 모델이 올바른지 확인하고 있어요.</string>
@@ -153,7 +153,7 @@
     <string name="loading_desc_failed">준비하는 중에 문제가 생겼어요.</string>
     <string name="loading_progress_percent">%1$d%%</string>
     <string name="loading_progress_bytes">%1$s / %2$s</string>
-    <string name="loading_progress_wait">수업준비가 금방 끝나요…</string>
+    <string name="loading_progress_wait">나만의 AI쌤이 열심히 준비중…</string>
     <string name="loading_btn_download">AI 모델 다운로드</string>
     <string name="loading_btn_retry">다시 시도</string>
     <string name="loading_btn_skip">나중에 하기</string>
