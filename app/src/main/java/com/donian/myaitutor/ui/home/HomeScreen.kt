@@ -24,7 +24,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -49,6 +50,7 @@ import com.donian.myaitutor.R
 import com.donian.myaitutor.ai.TutorGrade
 import com.donian.myaitutor.tutor.TutorResultScreen
 import com.donian.myaitutor.tutor.TutorUiState
+import com.donian.myaitutor.ui.components.TeacherAvatar
 import java.io.File
 
 @Composable
@@ -90,8 +92,9 @@ internal fun HomeScreen(
         contentWindowInsets = WindowInsets.safeDrawing,
         bottomBar = {
             Surface(
-                color = MaterialTheme.colorScheme.background,
-                tonalElevation = 3.dp
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 2.dp,
+                shadowElevation = 8.dp
             ) {
                 BoxWithConstraints(
                     modifier = Modifier
@@ -122,27 +125,35 @@ internal fun HomeScreen(
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding)
                 .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // 상단 헤더 - AI 선생님과 대화하는 느낌
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = stringResource(R.string.app_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f)
-                )
+                TeacherAvatar(size = 32)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.app_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "AI 선생님과 함께 공부해요",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 IconButton(onClick = onOpenSettings) {
                     Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.content_desc_open_settings))
                 }
             }
 
-            // 가로 스크롤 과목 선택 칩 바 (LazyRow를 사용해 부드러운 터치 스와이프 및 스크롤 지원)
+            // 가로 스크롤 과목 선택 칩 바
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -167,13 +178,15 @@ internal fun HomeScreen(
                 }
             }
 
+            // 대화 영역 카드
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f, fill = true),
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(
                     modifier = Modifier
@@ -181,7 +194,7 @@ internal fun HomeScreen(
                         .padding(12.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.SmartToy, contentDescription = stringResource(R.string.content_desc_ai_helper), tint = MaterialTheme.colorScheme.primary)
+                        Image(painter = painterResource(R.drawable.robot_tutor), contentDescription = stringResource(R.string.content_desc_ai_helper), modifier = Modifier.size(24.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
                             when (analysisStage) {

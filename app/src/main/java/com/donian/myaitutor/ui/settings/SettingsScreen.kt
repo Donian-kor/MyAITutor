@@ -3,6 +3,7 @@ package com.donian.myaitutor.ui.settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,12 +21,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -38,6 +41,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,6 +59,7 @@ import com.donian.myaitutor.BuildConfig
 import com.donian.myaitutor.R
 import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelDownloadStatus
+import com.donian.myaitutor.ui.components.TeacherAvatar
 import com.donian.myaitutor.ui.components.InfoCard
 
 @Composable
@@ -87,24 +92,44 @@ internal fun SettingsScreen(
                 .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // 상단 헤더 - AI 선생님 프로필
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.content_desc_back), modifier = Modifier.size(25.dp))
                 }
-                Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                TeacherAvatar(size = 36)
+                Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "AI 선생님 설정",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
+            // AI 선생님 모델 카드
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-                        Spacer(Modifier.width(10.dp))
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Image(painter = painterResource(R.drawable.robot_tutor), contentDescription = null, modifier = Modifier.size(28.dp))
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Gemma 4 E4B-IT", fontWeight = FontWeight.Bold)
+                            Text("Gemma 4 E4B-IT", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                             Text(stringResource(R.string.settings_engine_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -151,7 +176,6 @@ internal fun SettingsScreen(
                     } else {
                         Button(
                             onClick = onDownload,
-                            // 다운로드 중일 때만 비활성. PAUSED/QUEUED 는 재시도 가능해야 한다. (R-07)
                             enabled = snapshot.status != ModelDownloadStatus.DOWNLOADING,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp)
@@ -170,6 +194,7 @@ internal fun SettingsScreen(
                 }
             }
 
+            // 설정 액션 버튼들
             OutlinedButton(
                 onClick = onClearCache,
                 modifier = Modifier.fillMaxWidth(),
@@ -186,6 +211,7 @@ internal fun SettingsScreen(
                 Text(stringResource(R.string.settings_btn_licenses))
             }
 
+            // 정보 카드들
             InfoCard(
                 icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 title = stringResource(R.string.settings_ocr_title),
@@ -206,16 +232,29 @@ internal fun SettingsScreen(
                 title = stringResource(R.string.info_privacy_title),
                 body = stringResource(R.string.info_privacy_body)
             )
-            Text(
-                stringResource(
-                    R.string.settings_app_version,
-                    BuildConfig.VERSION_NAME
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(stringResource(R.string.settings_runtime_env), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(stringResource(R.string.settings_current_backend, backendLabel), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            // 버전 정보
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        stringResource(
+                            R.string.settings_app_version,
+                            BuildConfig.VERSION_NAME
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(stringResource(R.string.settings_runtime_env), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.settings_current_backend, backendLabel), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
     }
 

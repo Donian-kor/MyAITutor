@@ -63,6 +63,8 @@ import androidx.exifinterface.media.ExifInterface
 import com.donian.myaitutor.R
 import com.donian.myaitutor.ai.TutorGrade
 import com.donian.myaitutor.camera.ExifImageTransform
+import com.donian.myaitutor.ui.components.TeacherMessageBubble
+import com.donian.myaitutor.ui.components.TypingIndicator
 import com.donian.myaitutor.ui.home.FollowUpChips
 import com.donian.myaitutor.ui.text.AssistantAnswer
 import com.donian.myaitutor.ui.text.parseAnswerWithSuggestions
@@ -155,19 +157,17 @@ internal fun TutorResultScreen(
             }
             when {
                 answer.isNotBlank() -> {
-                    SelectionContainer {
-                        AssistantAnswer(
-                            text = answer,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                    TeacherMessageBubble {
+                        SelectionContainer {
+                            AssistantAnswer(
+                                text = answer,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
                 isAnalyzing -> {
-                    Text(
-                        text = "선생님이 해설을 준비하고 있어요.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    TypingIndicator()
                 }
                 else -> {
                     EmptyAnswerPlaceholder(
