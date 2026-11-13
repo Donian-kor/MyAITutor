@@ -5,6 +5,8 @@ import android.annotation.SuppressLint
 import android.hardware.display.DisplayManager
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
+import android.util.Size
 import android.view.Display
 import android.view.Surface
 import android.view.ViewGroup
@@ -12,6 +14,8 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.runtime.Composable
@@ -27,6 +31,20 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.io.File
+
+private const val TAG = "CameraPreview"
+
+/** OCR에 유리하도록 4:3 비율의 고해상도 캡처를 우선 요청합니다. */
+private val CAPTURE_RESOLUTION = Size(2560, 1920)
+
+private val HIGH_RESOLUTION_SELECTOR: ResolutionSelector = ResolutionSelector.Builder()
+    .setResolutionStrategy(
+        ResolutionStrategy(
+            CAPTURE_RESOLUTION,
+            ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+        )
+    )
+    .build()
 
 /** ImageCapture callback: destination file + result callback. */
 typealias CaptureImageAction = (File, (Result<File>) -> Unit) -> Unit
@@ -94,29 +112,47 @@ fun CameraPreview(
                 val preview = Preview.Builder().build().also {
                     it.surfaceProvider = previewView.surfaceProvider
                 }
-                val capture = ImageCapture.Builder()
-                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                    .setJpegQuality(95)
-                    .setTargetRotation(currentRotation())
-                    .build()
 
-                provider.unbindAll()
-                try {
-                    provider.bindToLifecycle(
-                        lifecycleOwner,
-                        CameraSelector.DEFAULT_BACK_CAMERA,
-                        preview,
-                        capture
-                    )
-                } catch (backError: Exception) {
-                    // 후면 카메라가 없는 기기(또는 사용 불가)에서는 전면으로 대체합니다.
-                    provider.bindToLifecycle(
-                        lifecycleOwner,
-                        CameraSelector.DEFAULT_FRONT_CAMERA,
-                        preview,
-                        capture
-                    )
+                fun buildCapture(preferHighResolution: Boolean): ImageCapture {
+                    val builder = ImageCapture.Builder()
+                        // ZSL 대신 품질 우선 모드: OCR 인식률을 위해 지연을 조금 감수합니다.
+                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                        .setJpegQuality(95)
+                        .setTargetRotation(currentRotation())
+                    if (preferHighResolution) {
+                        builder.setResolutionSelector(HIGH_RESOLUTION_SELECTOR)
+                    }
+                    return builder.build()
                 }
+
+                // 고해상도 후면 → 기본 후면 → 기본 전면 순서로 시도합니다.
+                val attempts = listOf(
+                    Triple(CameraSelector.DEFAULT_BACK_CAMERA, true, "후면 고해상도"),
+                    Triple(CameraSelector.DEFAULT_BACK_CAMERA, false, "후면 기본"),
+                    Triple(CameraSelector.DEFAULT_FRONT_CAMERA, false, "전면 기본")
+                )
+                var boundCapture: ImageCapture? = null
+                var lastError: Throwable? = null
+                for ((selector, highResolution, label) in attempts) {
+                    val candidate = runCatching { buildCapture(highResolution) }.getOrElse { error ->
+                        lastError = error
+                        Log.w(TAG, "$label 캡처 설정을 만들지 못했습니다.", error)
+                        null
+                    } ?: continue
+                    try {
+                        provider.unbindAll()
+                        provider.bindToLifecycle(lifecycleOwner, selector, preview, candidate)
+                        boundCapture = candidate
+                        break
+                    } catch (error: Exception) {
+                        lastError = error
+                        Log.w(TAG, "$label 카메라 바인딩에 실패했습니다.", error)
+                        runCatching { provider.unbindAll() }
+                    }
+                }
+
+                val capture = boundCapture
+                    ?: throw lastError ?: IllegalStateException("사용 가능한 카메라를 찾지 못했습니다.")
                 imageCapture = capture
             } catch (error: Exception) {
                 onCameraError(error.localizedMessage ?: "카메라를 시작하지 못했습니다.")

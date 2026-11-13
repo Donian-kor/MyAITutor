@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.donian.myaitutor.BuildConfig
 import com.donian.myaitutor.R
 import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelDownloadStatus
@@ -205,7 +206,14 @@ internal fun SettingsScreen(
                 title = stringResource(R.string.info_privacy_title),
                 body = stringResource(R.string.info_privacy_body)
             )
-            Text("나만의 AI쌤 0.0.1 · Gemma 4 E4B-IT LiteRT-LM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                stringResource(
+                    R.string.settings_app_version,
+                    BuildConfig.VERSION_NAME
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Text(stringResource(R.string.settings_runtime_env), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(R.string.settings_current_backend, backendLabel), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -232,7 +240,15 @@ internal fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showLicensesDialog = false },
             title = { Text(stringResource(R.string.dialog_licenses_title)) },
-            text = { Text(stringResource(R.string.dialog_licenses_content)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.dialog_licenses_content,
+                        BuildConfig.VERSION_NAME,
+                        BuildConfig.VERSION_CODE
+                    )
+                )
+            },
             confirmButton = {
                 TextButton(onClick = { showLicensesDialog = false }) { Text(stringResource(R.string.btn_dismiss)) }
             }

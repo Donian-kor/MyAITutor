@@ -62,6 +62,7 @@ import com.donian.myaitutor.camera.CaptureImageAction
 import com.donian.myaitutor.camera.ExifImageTransform
 import com.donian.myaitutor.camera.ImageSelection
 import java.io.File
+import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -292,11 +293,22 @@ private fun ImageSelectionOverlay(
                 var dragStart: Offset? = null
                 var dragEnd: Offset? = null
 
+                // 손가락이 살짝 스친 경우 아주 작은 영역이 잡혀 OCR이 실패하는 것을 막습니다.
+                val minShortSide = 16.dp.toPx()
+                val minLongSide = 32.dp.toPx()
+
                 fun selectionFor(start: Offset, end: Offset): ImageSelection? {
                     val startX = (start.x - imageBounds.left).coerceIn(0f, displayWidth)
                     val startY = (start.y - imageBounds.top).coerceIn(0f, displayHeight)
                     val endX = (end.x - imageBounds.left).coerceIn(0f, displayWidth)
                     val endY = (end.y - imageBounds.top).coerceIn(0f, displayHeight)
+                    val selectionWidth = abs(endX - startX)
+                    val selectionHeight = abs(endY - startY)
+                    if (minOf(selectionWidth, selectionHeight) < minShortSide ||
+                        maxOf(selectionWidth, selectionHeight) < minLongSide
+                    ) {
+                        return null
+                    }
                     return ImageSelection.fromPoints(
                         startX, startY, endX, endY, displayWidth, displayHeight
                     )

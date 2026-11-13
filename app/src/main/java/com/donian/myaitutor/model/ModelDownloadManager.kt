@@ -4,6 +4,7 @@ import android.app.DownloadManager
 import androidx.core.net.toUri
 import androidx.core.content.edit
 import android.content.Context
+import com.donian.myaitutor.BuildConfig
 import com.donian.myaitutor.R
 import android.os.Environment
 import android.os.StatFs
@@ -152,7 +153,7 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
                 Environment.DIRECTORY_DOWNLOADS,
                 MODEL_FILE_NAME
             )
-            .addRequestHeader("User-Agent", "MyAITutor-Android/0.0.1")
+            .addRequestHeader("User-Agent", "MyAITutor-Android/${BuildConfig.VERSION_NAME}")
 
         val id = downloadManager.enqueue(request)
         preferences.edit { putLong(KEY_DOWNLOAD_ID, id) }

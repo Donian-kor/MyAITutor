@@ -5,8 +5,12 @@ import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.util.Log
 import com.donian.myaitutor.ocr.OcrBlock
+import com.donian.myaitutor.ocr.OcrImageEnhancer
+import com.donian.myaitutor.ocr.OcrTextCandidate
+import com.donian.myaitutor.ocr.OcrTextPostProcessor
 import com.donian.myaitutor.ocr.OcrTextRecognizer
 import com.paddle.ocr.PaddleOCR
+import com.paddle.ocr.model.OCRResult
 import com.paddle.ocr.util.OpenCVUtils
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -40,53 +44,75 @@ class MyAITutorApplication : Application(), OcrTextRecognizer {
     }
 
     override suspend fun recognize(imageFile: File): List<OcrBlock> {
-        val bitmap = withContext(Dispatchers.IO) {
-            BitmapFactory.decodeFile(imageFile.absolutePath)
-        } ?: throw IllegalArgumentException("이미지를 불러오지 못했습니다.")
+        // 모델 로딩이 끝난 뒤에만 전처리를 시작해 실패 시 낭비를 줄입니다.
+        val ocr = paddleOcr.await()
 
-        return try {
-            val results = paddleOcr.await().recognize(bitmap).results
-            results.mapIndexed { index, result ->
-                // PaddleOCR 결과에서 위치, 신뢰도 등 추가 정보 추출
-                // SDK가 제공하는 필드에 따라 안전하게 접근
+        var enhancedFile: File? = null
+        var bitmap: android.graphics.Bitmap? = null
+        try {
+            val targetFile = withContext(Dispatchers.IO) {
+                enhancedFile = OcrImageEnhancer.enhance(imageFile)
+                enhancedFile ?: imageFile
+            }
+            bitmap = withContext(Dispatchers.IO) {
+                BitmapFactory.decodeFile(targetFile.absolutePath)
+            } ?: throw IllegalArgumentException("이미지를 불러오지 못했습니다.")
+
+            val decodedBitmap = bitmap
+            val results = ocr.recognize(decodedBitmap).results
+            val candidates = results.map { result ->
                 val bounds = extractBounds(result)
-                val confidence = if (result.confidence >= 0) result.confidence else null
-                // 텍스트 유형 추론 (단순 휴리스틱: 수식 기호 포함 여부)
-                val blockType = inferBlockType(result.text)
-                OcrBlock(
+                OcrTextCandidate(
                     text = result.text,
-                    type = blockType,
+                    confidence = if (result.confidence >= 0f) result.confidence else null,
+                    left = bounds?.left ?: 0,
+                    top = bounds?.top ?: 0,
+                    right = bounds?.right ?: 0,
+                    bottom = bounds?.bottom ?: 0,
+                    hasGeometry = bounds != null
+                )
+            }
+
+            return OcrTextPostProcessor.process(candidates).mapIndexed { index, candidate ->
+                val bounds = if (candidate.hasGeometry) {
+                    Rect(candidate.left, candidate.top, candidate.right, candidate.bottom)
+                } else {
+                    null
+                }
+                OcrBlock(
+                    text = candidate.text,
+                    type = inferBlockType(candidate.text),
                     bounds = bounds,
-                    confidence = confidence,
+                    confidence = candidate.confidence,
                     readingOrder = index,
                     sourceFile = imageFile.absolutePath
                 )
             }
         } finally {
-            bitmap.recycle()
+            bitmap?.recycle()
+            enhancedFile?.let { file ->
+                runCatching { if (file.exists()) file.delete() }
+            }
         }
     }
 
-    private fun extractBounds(result: Any): Rect? {
-        // PaddleOCR SDK가 제공하는 필드에 따라 안전하게 접근
-        // SDK가 제공하지 않는 필드는 null로 처리
-        return try {
-            val boundingBox = result.javaClass.getDeclaredField("bounding_box").apply { isAccessible = true }.get(result)
-            if (boundingBox != null) {
-                val left = boundingBox.javaClass.getDeclaredField("left").apply { isAccessible = true }.getFloat(boundingBox)
-                val top = boundingBox.javaClass.getDeclaredField("top").apply { isAccessible = true }.getFloat(boundingBox)
-                val right = boundingBox.javaClass.getDeclaredField("right").apply { isAccessible = true }.getFloat(boundingBox)
-                val bottom = boundingBox.javaClass.getDeclaredField("bottom").apply { isAccessible = true }.getFloat(boundingBox)
-                Rect(
-                    left.toInt(),
-                    top.toInt(),
-                    right.toInt(),
-                    bottom.toInt()
-                )
-            } else null
-        } catch (_: Exception) {
-            null
-        }
+    /**
+     * PaddleOCR의 사각형 좌표(4개 점)에서 화면 표시·정렬에 필요한 최소/최대 경계를 계산합니다.
+     */
+    private fun extractBounds(result: OCRResult): Rect? {
+        val points = result.box.points
+        if (points.isEmpty()) return null
+
+        val xs = points.map { it.x }
+        val ys = points.map { it.y }
+        if (xs.any { !it.isFinite() } || ys.any { !it.isFinite() }) return null
+
+        val left = xs.minOrNull()?.toInt() ?: return null
+        val top = ys.minOrNull()?.toInt() ?: return null
+        val right = xs.maxOrNull()?.toInt() ?: return null
+        val bottom = ys.maxOrNull()?.toInt() ?: return null
+        if (right <= left || bottom <= top) return null
+        return Rect(left, top, right, bottom)
     }
 
     private fun inferBlockType(text: String): OcrBlock.OcrBlockType {
