@@ -191,7 +191,7 @@ class GemmaAssistant(context: Context) : Assistant {
             request = AssistantRequest(
                 textParts = listOf(
                     "[OCR 인식 텍스트]\n$ocrText",
-                    analyzeImagePrompt(subject)
+                    analyzeImagePrompt(subject, TutorGrade.ELEMENTARY)
                 ),
                 startsNewProblem = true
             ),
@@ -206,7 +206,7 @@ class GemmaAssistant(context: Context) : Assistant {
         require(question.isNotBlank()) { "질문 내용을 입력해 주세요." }
         collectLegacy(
             request = AssistantRequest(
-                textParts = listOf(followUpPrompt(question)),
+                textParts = listOf(followUpPrompt(question, TutorGrade.ELEMENTARY)),
                 startsNewProblem = false
             ),
             onTextChanged = onTextChanged

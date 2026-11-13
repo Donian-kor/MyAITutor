@@ -102,10 +102,6 @@ internal fun analyzeImagePrompt(subject: String, grade: TutorGrade): String = ""
             - 맞춤 추천 질문 2
         """.trimIndent()
 
-/** 기존 호출부 호환용. 학년이 없는 레거시 경로는 초등 기준을 사용합니다. */
-internal fun analyzeImagePrompt(subject: String): String =
-    analyzeImagePrompt(subject, TutorGrade.ELEMENTARY)
-
 /** 후속 질문 프롬프트. */
 internal fun followUpPrompt(question: String, grade: TutorGrade): String = """
             [이어지는 질문]
@@ -123,10 +119,6 @@ internal fun followUpPrompt(question: String, grade: TutorGrade): String = """
             학생의 질문:
             $question
         """.trimIndent()
-
-/** 기존 호출부 호환용. */
-internal fun followUpPrompt(question: String): String =
-    followUpPrompt(question, TutorGrade.ELEMENTARY)
 
 /**
  * 후속 질문 답변 접두사. 이전 답변과 새 질문을 이어 붙인다.
