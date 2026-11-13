@@ -322,12 +322,15 @@ class GemmaAssistant(context: Context) : Assistant {
                 modelPath = modelFile.absolutePath,
                 backend = Backend.GPU(),
                 visionBackend = Backend.GPU(),
+                // 모델 기본값(32k)대로 두면 KV 버퍼가 과도하게 잡히므로 앱 예산으로 제한합니다.
+                maxNumTokens = MAX_CONTEXT_TOKENS,
                 cacheDir = appContext.cacheDir.absolutePath
             ),
             "CPU" to EngineConfig(
                 modelPath = modelFile.absolutePath,
                 backend = Backend.CPU(),
                 visionBackend = Backend.CPU(),
+                maxNumTokens = MAX_CONTEXT_TOKENS,
                 cacheDir = appContext.cacheDir.absolutePath
             )
         )

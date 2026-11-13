@@ -8,9 +8,16 @@ import com.donian.myaitutor.ai.GemmaAssistant
 import com.donian.myaitutor.ai.TutorGrade
 import com.donian.myaitutor.camera.ImageCropper
 import com.donian.myaitutor.camera.ImageSelection
+import com.donian.myaitutor.model.AppModel
+import com.donian.myaitutor.model.EngineRuntime
 import com.donian.myaitutor.model.ModelDownloadManager
 import com.donian.myaitutor.model.ModelDownloadRepository
 import com.donian.myaitutor.model.ModelDownloadStatus
+import com.donian.myaitutor.model.ModelRuntimeState
+import com.donian.myaitutor.model.ModelSelectionRepository
+import com.donian.myaitutor.model.ModelTransitionException
+import com.donian.myaitutor.model.PrefsModelSelectionRepository
+import com.donian.myaitutor.model.QwenModelDownloadManager
 import com.donian.myaitutor.ocr.OcrBlock
 import com.donian.myaitutor.ocr.OcrTextRecognizer
 import com.donian.myaitutor.tutor.LlmInferenceEngine
@@ -22,6 +29,8 @@ import com.donian.myaitutor.tutor.TutorStreamChunk
 import com.donian.myaitutor.tutor.TutorStreamParser
 import com.donian.myaitutor.tutor.TutorUiState
 import com.donian.myaitutor.tutor.inferenceOptionsFor
+import com.donian.myaitutor.ui.settings.AppSettingsRepository
+import com.donian.myaitutor.ui.settings.PrefsAppSettingsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -50,7 +59,6 @@ import java.io.File
 class HomeViewModel(
     private val appContext: Context,
     private val modelManager: ModelDownloadRepository = ModelDownloadManager(appContext),
-    assistant: Assistant = GemmaAssistant(appContext),
     private val scope: CoroutineScope,
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
     private val enablePolling: Boolean = true,
@@ -60,7 +68,14 @@ class HomeViewModel(
     private val stringProvider: StringProvider = StringProvider { resId, args ->
         appContext.getString(resId, *args)
     },
-    private val tutorEngine: LlmInferenceEngine = RealGemmaTutorEngine(assistant)
+    private val tutorEngine: LlmInferenceEngine = RealGemmaTutorEngine(GemmaAssistant(appContext)),
+    private val appSettings: AppSettingsRepository = PrefsAppSettingsRepository(appContext),
+    private val selectionRepository: ModelSelectionRepository =
+        PrefsModelSelectionRepository(appContext),
+    /** 모델 전환을 담당하는 조정자. [tutorEngine]이 SwitchableTutorEngine일 때 함께 주입합니다. */
+    private val runtimeCoordinator: EngineRuntime? = null,
+    /** Qwen 모델 다운로드 상태 조회. Gemma [modelManager]와 완전히 분리됩니다. */
+    private val qwenModelManager: ModelDownloadRepository = QwenModelDownloadManager(appContext)
 ) {
 
     private companion object {
@@ -74,7 +89,15 @@ class HomeViewModel(
     }
 
     private val _state = MutableStateFlow(
-        HomeUiState(modelSnapshot = modelManager.snapshot())
+        HomeUiState(
+            modelSnapshot = modelManager.snapshot(),
+            thinkingMode = appSettings.thinkingMode,
+            selectedModel = selectionRepository.getSelectedModel(),
+            selectedModelSnapshot = selectionRepository.getSelectedModel().let { model ->
+                if (model == AppModel.QWEN3) qwenModelManager.snapshot() else modelManager.snapshot()
+            },
+            chatMode = selectionRepository.isFreeChatEnabled()
+        )
     )
     val state: StateFlow<HomeUiState> = _state
 
@@ -111,7 +134,16 @@ class HomeViewModel(
                         }
                         modelManager.snapshot()
                     }
-                    _state.value = _state.value.copy(modelSnapshot = snapshot)
+                    val qwenSnapshot = withContext(ioDispatcher) { qwenModelManager.snapshot() }
+                    val selected = _state.value.selectedModel
+                    _state.value = _state.value.copy(
+                        modelSnapshot = snapshot,
+                        selectedModelSnapshot = if (selected == AppModel.QWEN3) qwenSnapshot else snapshot,
+                        runtimeState = runtimeCoordinator?.status?.value?.state
+                            ?: _state.value.runtimeState,
+                        freeChatBlockedReason = freeChatBlockedReasonFor(selected),
+                        modelSelectionBlockedReason = modelSelectionBlockedReasonFor(selected)
+                    )
                     val busy = snapshot.status == ModelDownloadStatus.DOWNLOADING ||
                         snapshot.status == ModelDownloadStatus.QUEUED ||
                         snapshot.status == ModelDownloadStatus.PAUSED ||
@@ -170,11 +202,158 @@ class HomeViewModel(
     }
 
     /**
+     * 설정 화면의 추론(Thinking) 모드 토글.
+     * 학년과 무관하게 사용자가 직접 켜고 끄며, 값은 저장되어 다음 실행에도 유지됩니다.
+     */
+    fun setThinkingMode(enabled: Boolean) {
+        if (_state.value.thinkingMode == enabled) return
+        appSettings.thinkingMode = enabled
+        _state.value = _state.value.copy(thinkingMode = enabled)
+    }
+
+    // ---------------------------------------------------------------------
+    // 모델 선택 (Gemma ↔ Qwen) 및 0.6 모드 정합
+    // ---------------------------------------------------------------------
+
+    /**
+     * 현재 선택된 모델이 자유 대화를 지원하지 않을 때의 안내 문구.
+     * Qwen 활성 시에만 null이 아니며, 자동으로 Gemma를 로드하지 않는다(계획서 0.6).
+     */
+    private fun freeChatBlockedReasonFor(model: AppModel): String? =
+        if (model == AppModel.QWEN3) {
+            stringProvider.get(R.string.model_free_chat_blocked_by_qwen)
+        } else {
+            null
+        }
+
+    /**
+     * 자유 대화 사용 중에는 Qwen 선택을 보류한다는 안내 문구.
+     * 사용자가 자유 대화를 끄면 선택할 수 있다.
+     */
+    private fun modelSelectionBlockedReasonFor(model: AppModel): String? =
+        if (model == AppModel.GEMMA && _state.value.chatMode) {
+            stringProvider.get(R.string.model_selection_blocked_by_free_chat)
+        } else {
+            null
+        }
+
+    /**
+     * 선택 모델을 [target]으로 전환합니다.
+     *
+     * - 자유 대화 사용 중이면 Qwen 선택을 보류하고 안내를 표시합니다.
+     * - 전환은 [EngineRuntime]가 직렬화하며, 이전 모델 자원 해제 후 새 모델을 로드합니다.
+     * - 실패 시 자동 복구된 경우/NO_MODEL_LOADED 상태를 안내합니다.
+     */
+    fun setSelectedModel(target: AppModel) {
+        if (_state.value.selectedModel == target) return
+        if (_state.value.isAnalyzing) {
+            tutorEngine.cancelGeneration()
+        }
+
+        scope.launch {
+            _state.value = _state.value.copy(runtimeState = ModelRuntimeState.TRANSITIONING)
+            val coordinator = runtimeCoordinator
+            val result = if (coordinator != null) {
+                coordinator.switchTo(target)
+            } else {
+                // 조정자가 없으면 선택값만 저장하고 런타임 전환은 건너뛴다(테스트 경로).
+                selectionRepository.setSelectedModel(target)
+                Result.success(tutorEngine)
+            }
+
+            result.fold(
+                onSuccess = { _ ->
+                    selectionRepository.setSelectedModel(target)
+                    _state.value = _state.value.copy(
+                        selectedModel = target,
+                        selectedModelSnapshot = if (target == AppModel.QWEN3) {
+                            qwenModelManager.snapshot()
+                        } else {
+                            modelManager.snapshot()
+                        },
+                        runtimeState = ModelRuntimeState.ACTIVE,
+                        transitionFailure = null,
+                        freeChatBlockedReason = freeChatBlockedReasonFor(target),
+                        modelSelectionBlockedReason = null
+                    )
+                    // Qwen 선택 시 자유 대화는 자동으로 꺼진다.
+                    if (target == AppModel.QWEN3 && _state.value.chatMode) {
+                        selectionRepository.setChatMode(false)
+                        _state.value = _state.value.copy(chatMode = false)
+                    }
+                },
+                onFailure = { error ->
+                    val recovered = error is ModelTransitionException && error.recoveredToPrevious
+                    val restoredModel = if (recovered) selectionRepository.getSelectedModel() else target
+                    _state.value = _state.value.copy(
+                        selectedModel = restoredModel,
+                        runtimeState = if (recovered) ModelRuntimeState.ACTIVE else ModelRuntimeState.NO_MODEL_LOADED,
+                        transitionFailure = error.message
+                            ?: stringProvider.get(R.string.error_model_transition_failed),
+                        freeChatBlockedReason = freeChatBlockedReasonFor(restoredModel),
+                        modelSelectionBlockedReason = modelSelectionBlockedReasonFor(restoredModel)
+                    )
+                    if (recovered) {
+                        setStatusMessage(stringProvider.get(R.string.status_qwen_switch_failed_to_gemma))
+                    }
+                }
+            )
+        }
+    }
+
+    /** 선택 모델의 다운로드를 시작합니다. 선택 모델이 Qwen이면 Qwen 관리자를 사용합니다. */
+    fun startSelectedModelDownload() {
+        val target = _state.value.selectedModel
+        val manager = if (target == AppModel.QWEN3) qwenModelManager else modelManager
+        runCatching { manager.startDownload() }
+            .onSuccess {
+                setStatusMessage(stringProvider.get(R.string.status_download_started))
+                refreshModelSnapshot()
+            }
+            .onFailure { setStatusMessage(stringProvider.get(R.string.status_download_failed)) }
+    }
+
+    /** 선택 모델의 모델 파일을 삭제합니다. 현재 활성 모델 삭제 시 먼저 엔진을 해제합니다. */
+    fun deleteSelectedModel() {
+        val target = _state.value.selectedModel
+        val manager = if (target == AppModel.QWEN3) qwenModelManager else modelManager
+        scope.launch {
+            // 활성 모델을 삭제하는 경우 활성 엔진을 먼저 해제한다.
+            runCatching {
+                withContext(ioDispatcher) { manager.deleteModel() }
+            }
+            refreshModelSnapshot()
+            setStatusMessage(stringProvider.get(R.string.status_model_deleted))
+        }
+    }
+
+    private fun refreshModelSnapshot() {
+        val selected = _state.value.selectedModel
+        val snapshot = if (selected == AppModel.QWEN3) {
+            qwenModelManager.snapshot()
+        } else {
+            modelManager.snapshot()
+        }
+        _state.value = _state.value.copy(
+            modelSnapshot = snapshot,
+            selectedModelSnapshot = snapshot
+        )
+    }
+
+    /**
      * 학습 모드와 자유 대화 모드를 전환합니다.
      * 시스템 지시문은 Conversation 생성 시 고정되므로 대화를 새로 만들어 교체합니다.
      */
     fun setChatMode(chatMode: Boolean) {
         if (_state.value.chatMode == chatMode) return
+        // 0.6: Qwen 활성 상태에서 자유 대화를 켜려는 요청은 차단한다.
+        // 자동으로 Gemma를 로드하지 않으며, 안내 문구만 표시한다.
+        if (chatMode && _state.value.selectedModel == AppModel.QWEN3) {
+            _state.value = _state.value.copy(
+                freeChatBlockedReason = freeChatBlockedReasonFor(AppModel.QWEN3)
+            )
+            return
+        }
         if (_state.value.isAnalyzing) {
             tutorEngine.cancelGeneration()
         }
@@ -202,6 +381,8 @@ class HomeViewModel(
             tutorState = TutorUiState()
         )
         val mode = if (chatMode) TutorMode.FREE_CHAT else TutorMode.LEARNING
+        // 모드가 바뀌면 저장값도 함께 갱신해 (모델, chatMode) 쌍의 정합을 유지한다.
+        selectionRepository.setChatMode(chatMode)
         scope.launch {
             runCatching { tutorEngine.resetConversation(mode.systemInstruction) }
         }
@@ -382,7 +563,10 @@ class HomeViewModel(
                     text = ocrText,
                     subject = subject,
                     grade = grade,
-                    options = inferenceOptionsFor(grade, isFollowUp = false)
+                    options = inferenceOptionsFor(
+                        isFollowUp = false,
+                        thinkingEnabled = _state.value.thinkingMode
+                    )
                 )
                 if (currentGeneration == generationId) {
                     _state.value = _state.value.copy(tutorState = tutorParser.onAnalysisStarted())
@@ -494,7 +678,10 @@ class HomeViewModel(
                     text = question,
                     subject = subject,
                     grade = grade,
-                    options = inferenceOptionsFor(grade, isFollowUp = true),
+                    options = inferenceOptionsFor(
+                        isFollowUp = true,
+                        thinkingEnabled = _state.value.thinkingMode
+                    ),
                     isStandaloneQuestion = isStandaloneQuestion,
                     mode = if (_state.value.chatMode) TutorMode.FREE_CHAT else TutorMode.LEARNING
                 )
@@ -731,7 +918,8 @@ class HomeViewModel(
         val current = _state.value
         if (current.warmup == ModelWarmupState.LOADING || current.warmup == ModelWarmupState.READY) return
         if (warmupJob?.isActive == true) return
-        if (current.modelSnapshot.status != ModelDownloadStatus.READY) return
+        // 선택 모델 기준으로 준비 여부를 판정한다. Gemma와 Qwen은 각각 독립 관리된다.
+        if (current.selectedModelSnapshot.status != ModelDownloadStatus.READY) return
 
         _state.value = _state.value.copy(warmup = ModelWarmupState.LOADING)
         warmupJob = scope.launch {

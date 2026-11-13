@@ -13,3 +13,7 @@ captures/
 # 설계·기획 문서 (작업용이므로 버전 관리에서 제외)
 /MyAITutor_개선안.md
 /구현계획서.md
+/MyAITutor_Qwen3_Implementation_Plan.md
+
+# 아이콘 원본 (drawable 리소스와 중복)
+/icon/

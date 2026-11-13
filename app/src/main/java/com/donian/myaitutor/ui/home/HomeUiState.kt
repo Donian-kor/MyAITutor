@@ -3,7 +3,9 @@ package com.donian.myaitutor.ui.home
 import com.donian.myaitutor.ai.DEFAULT_MAX_OUTPUT_TOKENS
 import com.donian.myaitutor.ai.MAX_CONTEXT_TOKENS
 import com.donian.myaitutor.ai.TutorGrade
+import com.donian.myaitutor.model.AppModel
 import com.donian.myaitutor.model.ModelDownloadSnapshot
+import com.donian.myaitutor.model.ModelRuntimeState
 import com.donian.myaitutor.ocr.OcrBlock
 import com.donian.myaitutor.tutor.TutorUiState
 import java.io.File
@@ -52,11 +54,13 @@ data class HomeUiState(
     val backendLabel: String = "아직 모델이 실행되지 않았습니다.",
     val showFollowUpChoices: Boolean = false,
     val tokenCount: Int = 0,
-    /** 모델의 전체 컨텍스트 상한. 표시용 단일 원본입니다. */
+    /** 앱이 사용하는 컨텍스트 예산(토큰). 표시용 단일 원본입니다. */
     val maxContextTokens: Int = MAX_CONTEXT_TOKENS,
     val maxOutputTokens: Int = DEFAULT_MAX_OUTPUT_TOKENS,
     /** 학년의 단일 원본. 별도 ViewModel/저장소를 만들지 않습니다. */
     val selectedGrade: TutorGrade = TutorGrade.ELEMENTARY,
+    /** 설정 화면에서 사용자가 켜고 끈 Thinking 사용 여부. 학년과 무관합니다. */
+    val thinkingMode: Boolean = false,
     /** UI 진행 정보만 담습니다. 해설 원본은 [answer]입니다. */
     val tutorState: TutorUiState = TutorUiState(),
     /** 시작 로딩 화면이 구독하는 엔진 워밍업 상태. */
@@ -66,5 +70,26 @@ data class HomeUiState(
     /** 채팅 메시지 목록 (AI 답변 + 학생 질문 분리 표시용). */
     val messages: List<ChatMessage> = emptyList(),
     /** true이면 과목과 무관한 자유 대화 모드입니다. */
-    val chatMode: Boolean = false
-)
+    val chatMode: Boolean = false,
+    /** 현재 선택된 실행 모델. 저장값이 없으면 GEMMA입니다. */
+    val selectedModel: AppModel = AppModel.GEMMA,
+    /** 선택 모델의 다운로드 스냅샷. Gemma와 Qwen을 각각 독립 관리합니다. */
+    val selectedModelSnapshot: ModelDownloadSnapshot = modelSnapshot,
+    /** 활성 모델 런타임 상태. 전환 중에는 입력을 잠급니다. */
+    val runtimeState: ModelRuntimeState = ModelRuntimeState.IDLE,
+    /** 마지막 전환 실패 사유. null이면 실패 없음. */
+    val transitionFailure: String? = null,
+    /** 자유 대화를 켤 수 없는 이유. null이면 차단 없음(계획서 0.6). */
+    val freeChatBlockedReason: String? = null,
+    /** Qwen 선택을 보류해야 하는 이유. null이면 선택 가능(계획서 0.6). */
+    val modelSelectionBlockedReason: String? = null
+) {
+    /** 전환 중이거나 모델을 사용할 수 없으면 입력을 잠급니다. */
+    val isModelBusy: Boolean
+        get() = runtimeState == ModelRuntimeState.TRANSITIONING ||
+            runtimeState == ModelRuntimeState.NO_MODEL_LOADED
+
+    /** 자유 대화 칩을 사용할 수 있는지 여부. Qwen 활성 시 false입니다. */
+    val isFreeChatAvailable: Boolean
+        get() = freeChatBlockedReason == null
+}

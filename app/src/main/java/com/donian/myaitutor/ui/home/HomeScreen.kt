@@ -110,7 +110,8 @@ internal fun HomeScreen(
     onChatModeChange: (Boolean) -> Unit,
     tutorState: TutorUiState,
     onRecoverTutor: () -> Unit,
-    messages: List<ChatMessage>
+    messages: List<ChatMessage>,
+    freeChatBlockedReason: String? = null
 ) {
     val inputFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -262,9 +263,10 @@ internal fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // 자유 대화 모드 스위치
+                        // 자유 대화 모드 스위치. Qwen 활성 시 비활성화되고 안내 문구가 표시된다 (0.6).
                         FilterChip(
                             selected = chatMode,
+                            enabled = freeChatBlockedReason == null,
                             onClick = { onChatModeChange(!chatMode) },
                             label = {
                                 Text(
@@ -442,6 +444,16 @@ internal fun HomeScreen(
                             onRetry = onRetryAnalysis,
                             onDismiss = onDismissStatus
                         )
+
+                        // 자유 대화가 차단된 경우 사유를 안내한다 (계획서 0.6).
+                        if (freeChatBlockedReason != null) {
+                            Text(
+                                freeChatBlockedReason,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                 }
             }

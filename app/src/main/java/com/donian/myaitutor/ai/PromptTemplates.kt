@@ -11,14 +11,20 @@ enum class TutorGrade(
     ELEMENTARY("초등", "초등학생"),
     MIDDLE("중등", "중학생"),
     HIGH("고등", "고등학생");
-
-    /** 중등·고등만 Thought 채널을 사용하는 Thinking을 켭니다. */
-    val usesThinking: Boolean
-        get() = this == MIDDLE || this == HIGH
 }
 
 /**
- * 모델의 전체 컨텍스트 상한. 이 값을 넘는 요청은 모델이 자르거나 실패합니다.
+ * 앱이 사용하는 컨텍스트 예산(토큰).
+ *
+ * 모델 자체의 상한은 아니다. `gemma-4-E4B-it.litertlm`은 최대 32k 토큰을 지원하지만,
+ * 모바일 KV 캐시 메모리 때문에 앱이 제한한 값이다.
+ * 이 값은 `EngineConfig.maxNumTokens`에도 그대로 전달되어 네이티브 KV 버퍼 크기를 결정한다.
+ *
+ * 실측 근거(SM-F926N 12GB, GPU 백엔드): 8,192로 설정했을 때 추론 중 Graphics 메모리가
+ * 로드 직후 2.76GB에서 4.74GB로 약 1.98GB 증가했고, MemAvailable이 1.56GB까지 떨어졌다.
+ * KV는 컨텍스트에 비례하므로 4,096은 그 증가분을 절반 수준으로 억제한다.
+ * 8GB 기기 데이터는 없으며, 더 낮출 필요가 확인되면 이 값만 조정한다.
+ *
  * 화면 표시, 대화 리셋 임계값, 출력 상한이 모두 이 값을 기준으로 계산됩니다.
  */
 internal const val MAX_CONTEXT_TOKENS: Int = 4_096
@@ -30,17 +36,15 @@ internal const val DEFAULT_MAX_OUTPUT_TOKENS: Int = 1_024
 internal const val DEFAULT_THINKING_TOKEN_BUDGET: Int = 512
 
 /**
- * 시스템 지시문이 차지하는 대략적인 토큰 여유분.
- * 자유 대화 지시문이 약 1,900토큰이므로 그보다 크게 잡아 안전 여유를 둡니다.
+ * 대화 전체 토큰 수가 이 값에 도달하면 문맥을 초기화합니다.
+ *
+ * 비교 대상은 `Conversation.getTokenCount()`이며, **시스템 지시문이 이미 포함된 값**입니다.
+ * 따라서 여기서 시스템 지시문을 따로 빼지 않습니다. 출력 예약분만 제외하면
+ * 초기화 이후에도 응답이 [MAX_CONTEXT_TOKENS]를 넘지 않습니다.
+ *
+ * 예: 4,096 - 1,024 = 3,072. 시스템 지시문이 약 800토큰이면 실제 대화 여유는 약 2,270토큰입니다.
  */
-internal const val SYSTEM_PROMPT_TOKEN_RESERVE: Int = 2_048
-
-/**
- * 대화가 이 토큰 수에 도달하면 문맥을 초기화합니다.
- * [MAX_CONTEXT_TOKENS]에서 시스템 지시문과 한 번의 출력을 뺀 값입니다.
- */
-internal const val MAX_CONVERSATION_TOKENS: Int =
-    MAX_CONTEXT_TOKENS - SYSTEM_PROMPT_TOKEN_RESERVE - DEFAULT_MAX_OUTPUT_TOKENS
+internal const val MAX_CONVERSATION_TOKENS: Int = MAX_CONTEXT_TOKENS - DEFAULT_MAX_OUTPUT_TOKENS
 
 /**
  * 학습 모드 전용 안전 규칙. 문제 풀이 맥락에서 필요한 항목만 압축해 담습니다.

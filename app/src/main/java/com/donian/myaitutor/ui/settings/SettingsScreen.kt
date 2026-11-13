@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -46,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -62,6 +64,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.donian.myaitutor.BuildConfig
 import com.donian.myaitutor.R
+import com.donian.myaitutor.model.AppModel
 import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelDownloadStatus
 import com.donian.myaitutor.ui.components.TeacherAvatar
@@ -80,10 +83,17 @@ import com.donian.myaitutor.ui.components.InfoCard
 internal fun SettingsScreen(
     snapshot: ModelDownloadSnapshot,
     backendLabel: String,
+    thinkingMode: Boolean,
+    onThinkingModeChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onDownload: () -> Unit,
     onDeleteModel: () -> Unit,
-    onClearCache: () -> Unit
+    onClearCache: () -> Unit,
+    selectedModel: AppModel = AppModel.GEMMA,
+    qwenSnapshot: ModelDownloadSnapshot = snapshot,
+    isModelTransitioning: Boolean = false,
+    modelSelectionBlockedReason: String? = null,
+    onModelSelected: (AppModel) -> Unit = {}
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showLicensesDialog by remember { mutableStateOf(false) }
@@ -312,6 +322,62 @@ internal fun SettingsScreen(
                                 )
                             }
                         }
+                    }
+                }
+            }
+
+            // 모델 선택 카드 (Gemma / Qwen). 기존 Gemma 카드를 대체하지 않고 별도 추가한다.
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(animationSpec = tween(500, delayMillis = 120))
+            ) {
+                ModelSelectionCard(
+                    selectedModel = selectedModel,
+                    gemmaStatus = snapshot.status,
+                    qwenStatus = qwenSnapshot.status,
+                    isTransitioning = isModelTransitioning,
+                    blockedReason = modelSelectionBlockedReason,
+                    onModelSelected = onModelSelected
+                )
+            }
+
+            // 추론(Thinking) 모드 설정
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(animationSpec = tween(500, delayMillis = 150))
+            ) {
+                Surface(
+                    shape = shapes.large,
+                    color = colors.surface,
+                    shadowElevation = 2.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Lightbulb,
+                            contentDescription = null,
+                            tint = colors.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.settings_thinking_title),
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                stringResource(R.string.settings_thinking_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.onSurfaceVariant
+                            )
+                        }
+                        Switch(checked = thinkingMode, onCheckedChange = onThinkingModeChange)
                     }
                 }
             }

@@ -33,6 +33,27 @@
     <string name="settings_engine_desc">LiteRT-LM · 온디바이스 멀티모달 AI</string>
     <string name="settings_model_status">모델 상태</string>
     <string name="settings_runtime_env">실행 환경: 기기 메모리에 맞춰 모델 로딩과 추론이 최적화됩니다.</string>
+
+    <!-- 모델 선택 (Gemma / Qwen) -->
+    <string name="model_selection_title">AI 모델 선택</string>
+    <string name="model_gemma_name">나만의 AI쌤 (Gemma 4 E4B)</string>
+    <string name="model_gemma_desc">멀티모달 · 자유 대화 지원 · 기본 모델</string>
+    <string name="model_qwen_name">Qwen3-4B-Instruct-2507</string>
+    <string name="model_qwen_desc">학습 모드 전용 · 약 2.66GB</string>
+    <string name="model_qwen_size">다운로드 약 2.66GB</string>
+    <string name="model_gemma_size">다운로드 약 3.66GB</string>
+    <string name="model_single_load_notice">한 번에 하나의 AI 모델만 메모리에 로드됩니다.</string>
+    <string name="model_free_chat_blocked_by_qwen">자유 대화는 나만의 AI쌤(Gemma)에서 사용할 수 있어요.</string>
+    <string name="model_selection_blocked_by_free_chat">자유 대화 사용 중에는 Qwen을 선택할 수 없어요. 자유 대화를 끄면 선택할 수 있습니다.</string>
+    <string name="model_transitioning_notice">AI 모델을 전환하고 있어요. 잠시만 기다려 주세요.</string>
+    <string name="status_qwen_switch_failed_to_gemma">Qwen 모델을 불러오지 못했습니다. Gemma로 돌아왔습니다.</string>
+    <string name="error_model_transition_failed">AI 모델 전환에 실패했습니다. 다시 시도해 주세요.</string>
+    <string name="error_no_model_loaded">AI 모델이 로드되지 않았습니다. 설정에서 모델을 선택해 주세요.</string>
+    <string name="error_cpu_fallback_blocked">이 기기에서는 CPU 폴백을 위한 메모리가 부족해 모델을 로드할 수 없습니다.</string>
+    <string name="error_context_overflow">입력이 모델의 컨텍스트 한도를 넘어섰습니다. 문제를 나누어 입력해 주세요.</string>
+    <!-- 추론(Thinking) 모드 -->
+    <string name="settings_thinking_title">Gemma 4 추론 모드</string>
+    <string name="settings_thinking_desc">켜면 답을 내기 전에 스스로 단계를 따져 생각한 뒤 답변합니다. 정확도는 올라가지만 답변이 느려지고 토큰을 더 사용합니다. 학년과 무관하게 직접 켜고 끕니다.</string>
     <string name="settings_current_backend">현재 백엔드: %1$s</string>
     <string name="settings_token_usage">대화 토큰 사용량: %1$d / %2$d 토큰 (출력 제한: %3$d 토큰)</string>
     <string name="settings_btn_clear_cache">임시 파일 캐시 정리</string>

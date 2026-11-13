@@ -62,11 +62,16 @@ data class TutorRequest(
     val mode: TutorMode = TutorMode.LEARNING
 )
 
-/** 학년별 Thinking/출력 토큰 설정을 한 곳에서 만듭니다. */
-fun inferenceOptionsFor(grade: TutorGrade, isFollowUp: Boolean): InferenceOptions =
+/**
+ * 요청별 추론 설정을 한 곳에서 만듭니다.
+ *
+ * Thinking은 학년에 연동되지 않는다. 설정 화면에서 사용자가 직접 켜고 끈
+ * [thinkingEnabled] 값만 사용한다.
+ */
+fun inferenceOptionsFor(isFollowUp: Boolean, thinkingEnabled: Boolean): InferenceOptions =
     InferenceOptions(
-        thinkingEnabled = grade.usesThinking,
-        thinkingTokenBudget = if (grade.usesThinking) DEFAULT_THINKING_TOKEN_BUDGET else 0,
+        thinkingEnabled = thinkingEnabled,
+        thinkingTokenBudget = if (thinkingEnabled) DEFAULT_THINKING_TOKEN_BUDGET else 0,
         maxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS,
         isFollowUp = isFollowUp
     )

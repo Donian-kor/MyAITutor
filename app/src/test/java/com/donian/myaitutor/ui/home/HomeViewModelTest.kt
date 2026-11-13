@@ -10,13 +10,15 @@ import com.donian.myaitutor.ai.DEFAULT_MAX_OUTPUT_TOKENS
 import com.donian.myaitutor.ai.DEFAULT_THINKING_TOKEN_BUDGET
 import com.donian.myaitutor.ai.MAX_CONTEXT_TOKENS
 import com.donian.myaitutor.ai.MAX_CONVERSATION_TOKENS
-import com.donian.myaitutor.ai.SYSTEM_PROMPT_TOKEN_RESERVE
 import com.donian.myaitutor.ai.SystemInstruction
 import com.donian.myaitutor.ai.TutorGrade
 import com.donian.myaitutor.ai.gradeChatTone
+import com.donian.myaitutor.model.AppModel
 import com.donian.myaitutor.model.ModelDownloadRepository
 import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelDownloadStatus
+import com.donian.myaitutor.model.ModelSelection
+import com.donian.myaitutor.model.ModelSelectionRepository
 import com.donian.myaitutor.ocr.OcrBlock
 import com.donian.myaitutor.ocr.OcrTextRecognizer
 import com.donian.myaitutor.tutor.FakeGemmaTutorEngine
@@ -25,6 +27,7 @@ import com.donian.myaitutor.tutor.TutorMode
 import com.donian.myaitutor.tutor.TutorRequest
 import com.donian.myaitutor.tutor.TutorStreamChunk
 import com.donian.myaitutor.tutor.inferenceOptionsFor
+import com.donian.myaitutor.ui.settings.AppSettingsRepository
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -132,24 +135,75 @@ class HomeViewModelTest {
         override suspend fun verifyModelHash(): Boolean = true
     }
 
+    /** Qwen 다운로드 상태를 테스트에서 주입할 수 있는 관리자 대역. */
+    private class FakeQwenRepo(private val ready: Boolean = true) : ModelDownloadRepository {
+        override val modelFile: File = File("fake_qwen.litertlm")
+        override fun snapshot() = ModelDownloadSnapshot(
+            if (ready) ModelDownloadStatus.READY else ModelDownloadStatus.NOT_INSTALLED,
+            0L, 0L, ""
+        )
+
+        override fun startDownload(): Long = 1L
+        override fun deleteModel() {}
+        override fun isModelReady(): Boolean = ready
+        override fun needsHashVerification(): Boolean = false
+        override suspend fun verifyModelHash(): Boolean = true
+    }
+
+    /** SharedPreferences를 쓰지 않는 설정 저장소 대역. */
+    private class FakeAppSettings(override var thinkingMode: Boolean = false) :
+        AppSettingsRepository
+
+    /** SharedPreferences를 쓰지 않는 모델 선택 저장소 대역. */
+    private class FakeSelectionRepository(
+        model: AppModel = AppModel.GEMMA,
+        chatMode: Boolean = false
+    ) : ModelSelectionRepository {
+        var selection = ModelSelection(model, chatMode)
+            private set
+
+        override fun get(): ModelSelection = selection
+
+        override fun getSelectedModel(): AppModel = selection.model
+
+        override fun isFreeChatEnabled(): Boolean = selection.chatMode
+
+        override fun setSelectedModel(model: AppModel) {
+            selection = selection.copy(
+                model = model,
+                chatMode = if (model == AppModel.QWEN3) false else selection.chatMode
+            )
+        }
+
+        override fun setChatMode(enabled: Boolean) {
+            if (enabled && selection.model == AppModel.QWEN3) return
+            selection = selection.copy(chatMode = enabled)
+        }
+    }
+
     private fun createViewModel(
         scope: kotlinx.coroutines.CoroutineScope,
         app: TestApp = TestApp(),
         assistant: FakeAssistant = FakeAssistant(),
         engine: FakeGemmaTutorEngine = FakeGemmaTutorEngine(),
         ready: Boolean = true,
-        stringProvider: StringProvider = StringProvider { _, _ -> "테스트" }
+        appSettings: AppSettingsRepository = FakeAppSettings(),
+        stringProvider: StringProvider = StringProvider { _, _ -> "테스트" },
+        selectionRepository: ModelSelectionRepository = FakeSelectionRepository(),
+        qwenModelManager: ModelDownloadRepository = FakeQwenRepo()
     ): Pair<HomeViewModel, FakeGemmaTutorEngine> {
         val vm = HomeViewModel(
             app,
             FakeRepo(ready),
-            assistant,
             scope,
             kotlinx.coroutines.Dispatchers.Unconfined,
-            false,
+            enablePolling = false,
             ocrLogger = {},
             stringProvider = stringProvider,
-            tutorEngine = engine
+            tutorEngine = engine,
+            appSettings = appSettings,
+            selectionRepository = selectionRepository,
+            qwenModelManager = qwenModelManager
         )
         return vm to engine
     }
@@ -238,11 +292,12 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `중등 이상은 Thinking을 켜고 초등은 끈다`() = runTest {
+    fun `Thinking은 학년과 무관하게 기본값이 꺼짐 상태다`() = runTest {
         val engine = FakeGemmaTutorEngine()
         val (vm, _) = createViewModel(this, engine = engine)
         val file = File.createTempFile("img", ".jpg")
 
+        // 학년을 바꿔도 Thinking이 자동으로 켜지지 않습니다.
         vm.selectGrade(TutorGrade.ELEMENTARY)
         vm.analyzeImage(file, "수학")
         advanceUntilIdle()
@@ -254,10 +309,65 @@ class HomeViewModelTest {
         vm.analyzeImage(file, "수학")
         advanceUntilIdle()
         val highOptions = engine.requests.last().options
-        assertTrue(highOptions.thinkingEnabled)
-        assertEquals(DEFAULT_THINKING_TOKEN_BUDGET, highOptions.thinkingTokenBudget)
+        assertFalse(highOptions.thinkingEnabled)
+        assertEquals(0, highOptions.thinkingTokenBudget)
 
         file.delete()
+    }
+
+    @Test
+    fun `설정에서 Thinking을 켜면 요청에 반영된다`() = runTest {
+        val engine = FakeGemmaTutorEngine()
+        val (vm, _) = createViewModel(this, engine = engine)
+        val file = File.createTempFile("img", ".jpg")
+
+        vm.setThinkingMode(true)
+        assertTrue(vm.state.value.thinkingMode)
+
+        vm.analyzeImage(file, "수학")
+        advanceUntilIdle()
+        val options = engine.requests.last().options
+        assertTrue(options.thinkingEnabled)
+        assertEquals(DEFAULT_THINKING_TOKEN_BUDGET, options.thinkingTokenBudget)
+
+        file.delete()
+    }
+
+    @Test
+    fun `설정에서 Thinking을 끄면 요청에서 제외된다`() = runTest {
+        val engine = FakeGemmaTutorEngine()
+        val (vm, _) = createViewModel(this, engine = engine)
+        val file = File.createTempFile("img", ".jpg")
+
+        vm.setThinkingMode(true)
+        vm.analyzeImage(file, "수학")
+        advanceUntilIdle()
+        assertTrue(engine.requests.last().options.thinkingEnabled)
+
+        vm.setThinkingMode(false)
+        assertFalse(vm.state.value.thinkingMode)
+        vm.analyzeImage(file, "수학")
+        advanceUntilIdle()
+        val options = engine.requests.last().options
+        assertFalse(options.thinkingEnabled)
+        assertEquals(0, options.thinkingTokenBudget)
+
+        file.delete()
+    }
+
+    @Test
+    fun `Thinking 설정은 저장소에 기록되고 시작 시 복원된다`() = runTest {
+        val settings = FakeAppSettings(thinkingMode = true)
+        val (vm, _) = createViewModel(this, appSettings = settings)
+
+        // 저장된 값이 초기 상태로 복원됩니다.
+        assertTrue(vm.state.value.thinkingMode)
+
+        vm.setThinkingMode(false)
+        assertFalse(settings.thinkingMode)
+
+        vm.setThinkingMode(true)
+        assertTrue(settings.thinkingMode)
     }
 
     @Test
@@ -603,7 +713,7 @@ class HomeViewModelTest {
             text = "오늘 친구랑 크게 싸웠어",
             subject = "기타",
             grade = TutorGrade.MIDDLE,
-            options = inferenceOptionsFor(TutorGrade.MIDDLE, isFollowUp = true),
+            options = inferenceOptionsFor(isFollowUp = true, thinkingEnabled = false),
             mode = TutorMode.FREE_CHAT
         )
 
@@ -677,16 +787,16 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `컨텍스트 예산은 모델 한계 4096을 넘지 않는다`() = runTest {
+    fun `컨텍스트 예산은 앱 예산 상수 하나에서 계산된다`() = runTest {
+        // 앱 예산은 실측(8,192에서 KV Graphics가 약 1.98GB 증가)에 근거한 값입니다.
+        // 모델 자체 상한(32k)이 아닙니다.
         assertEquals(4_096, MAX_CONTEXT_TOKENS)
-        // 시스템 지시문 여유 + 출력 상한이 전체 컨텍스트 안에 들어와야 합니다.
-        assertTrue(SYSTEM_PROMPT_TOKEN_RESERVE + DEFAULT_MAX_OUTPUT_TOKENS < MAX_CONTEXT_TOKENS)
-        // 대화 리셋 임계값은 계산식과 일치하고 0보다 커야 합니다.
-        assertEquals(
-            MAX_CONTEXT_TOKENS - SYSTEM_PROMPT_TOKEN_RESERVE - DEFAULT_MAX_OUTPUT_TOKENS,
-            MAX_CONVERSATION_TOKENS
-        )
-        assertTrue(MAX_CONVERSATION_TOKENS > 0)
+        // 리셋 임계값은 출력 예약분만 제외합니다. getTokenCount()에 시스템 지시문이 이미
+        // 포함되어 있으므로 시스템 지시문을 한 번 더 빼면 대화가 거의 매 턴 초기화됩니다.
+        assertEquals(MAX_CONTEXT_TOKENS - DEFAULT_MAX_OUTPUT_TOKENS, MAX_CONVERSATION_TOKENS)
+        assertEquals(3_072, MAX_CONVERSATION_TOKENS)
+        // 초기화 직후 응답을 출력 상한만큼 생성해도 전체 예산을 넘지 않아야 합니다.
+        assertTrue(MAX_CONVERSATION_TOKENS + DEFAULT_MAX_OUTPUT_TOKENS <= MAX_CONTEXT_TOKENS)
         // Thinking 예산은 출력 상한 안에 포함되므로 출력 상한보다 작아야 합니다.
         assertTrue(DEFAULT_THINKING_TOKEN_BUDGET < DEFAULT_MAX_OUTPUT_TOKENS)
     }
@@ -707,7 +817,7 @@ class HomeViewModelTest {
             text = "2 + 3 = ?",
             subject = "수학",
             grade = TutorGrade.MIDDLE,
-            options = inferenceOptionsFor(TutorGrade.MIDDLE, isFollowUp = false)
+            options = inferenceOptionsFor(isFollowUp = false, thinkingEnabled = true)
         )
 
         engine.stream(request).toList()
@@ -730,7 +840,7 @@ class HomeViewModelTest {
             text = "왜 그런가요?",
             subject = "수학",
             grade = TutorGrade.ELEMENTARY,
-            options = inferenceOptionsFor(TutorGrade.ELEMENTARY, isFollowUp = true)
+            options = inferenceOptionsFor(isFollowUp = true, thinkingEnabled = false)
         )
 
         engine.stream(request).toList()
@@ -750,7 +860,7 @@ class HomeViewModelTest {
             text = "조선 시대 세종의 업적을 알려줘",
             subject = "역사",
             grade = TutorGrade.MIDDLE,
-            options = inferenceOptionsFor(TutorGrade.MIDDLE, isFollowUp = true),
+            options = inferenceOptionsFor(isFollowUp = true, thinkingEnabled = false),
             isStandaloneQuestion = true
         )
 
@@ -770,7 +880,7 @@ class HomeViewModelTest {
             text = "이차방정식을 풀어라",
             subject = "수학",
             grade = TutorGrade.MIDDLE,
-            options = inferenceOptionsFor(TutorGrade.MIDDLE, isFollowUp = false)
+            options = inferenceOptionsFor(isFollowUp = false, thinkingEnabled = true)
         )
 
         engine.stream(request).toList()
@@ -790,7 +900,7 @@ class HomeViewModelTest {
             text = "조선 후기 신분제 변화를 설명해라",
             subject = "사회",
             grade = TutorGrade.MIDDLE,
-            options = inferenceOptionsFor(TutorGrade.MIDDLE, isFollowUp = false)
+            options = inferenceOptionsFor(isFollowUp = false, thinkingEnabled = true)
         )
 
         engine.stream(request).toList()
@@ -810,7 +920,7 @@ class HomeViewModelTest {
             text = "왜 그런가요?",
             subject = "영어",
             grade = TutorGrade.MIDDLE,
-            options = inferenceOptionsFor(TutorGrade.MIDDLE, isFollowUp = true)
+            options = inferenceOptionsFor(isFollowUp = true, thinkingEnabled = false)
         )
 
         engine.stream(request).toList()
@@ -829,7 +939,7 @@ class HomeViewModelTest {
             text = "한자 급수 시험 범위를 알려줘",
             subject = "한자",
             grade = TutorGrade.MIDDLE,
-            options = inferenceOptionsFor(TutorGrade.MIDDLE, isFollowUp = true),
+            options = inferenceOptionsFor(isFollowUp = true, thinkingEnabled = false),
             isStandaloneQuestion = true
         )
 

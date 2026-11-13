@@ -103,10 +103,10 @@ fun FocusAiApp(host: HomeViewModelHost) {
         activity?.finishAndRemoveTask()
     }
 
-    LaunchedEffect(uiState.modelSnapshot.status) {
-        if (uiState.modelSnapshot.status == ModelDownloadStatus.READY) {
+    LaunchedEffect(uiState.selectedModelSnapshot.status) {
+        if (uiState.selectedModelSnapshot.status == ModelDownloadStatus.READY) {
             viewModel.preWarmIfNeeded()
-        } else if (uiState.modelSnapshot.status == ModelDownloadStatus.NOT_INSTALLED) {
+        } else if (uiState.selectedModelSnapshot.status == ModelDownloadStatus.NOT_INSTALLED) {
             viewModel.setStatusMessage(modelDownloadAvailable)
         }
     }
@@ -118,30 +118,37 @@ fun FocusAiApp(host: HomeViewModelHost) {
         }
     }
 
-    val loadingPhase = resolveModelLoadingPhase(uiState.modelSnapshot, uiState.warmup)
+    val loadingPhase = resolveModelLoadingPhase(uiState.selectedModelSnapshot, uiState.warmup)
 
     if (!showMain) {
         ModelLoadingScreen(
             phase = loadingPhase,
-            snapshot = uiState.modelSnapshot,
-            onDownload = { viewModel.startDownload() },
+            snapshot = uiState.selectedModelSnapshot,
+            onDownload = { viewModel.startSelectedModelDownload() },
             onRetry = {
-                if (uiState.modelSnapshot.status == ModelDownloadStatus.READY) {
+                if (uiState.selectedModelSnapshot.status == ModelDownloadStatus.READY) {
                     viewModel.retryModelWarmup()
                 } else {
-                    viewModel.startDownload()
+                    viewModel.startSelectedModelDownload()
                 }
             },
             onSkip = { showMain = true }
         )
     } else if (showSettings) {
         SettingsScreen(
-            snapshot = uiState.modelSnapshot,
+            snapshot = uiState.selectedModelSnapshot,
             backendLabel = uiState.backendLabel,
+            thinkingMode = uiState.thinkingMode,
+            onThinkingModeChange = { viewModel.setThinkingMode(it) },
             onBack = { showSettings = false },
-            onDownload = { viewModel.startDownload() },
-            onDeleteModel = { viewModel.deleteModel() },
-            onClearCache = { viewModel.clearCache() }
+            onDownload = { viewModel.startSelectedModelDownload() },
+            onDeleteModel = { viewModel.deleteSelectedModel() },
+            onClearCache = { viewModel.clearCache() },
+            selectedModel = uiState.selectedModel,
+            qwenSnapshot = uiState.selectedModelSnapshot,
+            isModelTransitioning = uiState.isModelBusy,
+            modelSelectionBlockedReason = uiState.modelSelectionBlockedReason,
+            onModelSelected = { viewModel.setSelectedModel(it) }
         )
     } else if (showCamera) {
         CameraRoute(
@@ -198,7 +205,8 @@ fun FocusAiApp(host: HomeViewModelHost) {
             onChatModeChange = { viewModel.setChatMode(it) },
             tutorState = uiState.tutorState,
             onRecoverTutor = { viewModel.recoverTutor() },
-            messages = uiState.messages
+            messages = uiState.messages,
+            freeChatBlockedReason = uiState.freeChatBlockedReason
         )
     }
 }
