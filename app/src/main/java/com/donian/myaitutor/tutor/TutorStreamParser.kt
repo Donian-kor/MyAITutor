@@ -282,20 +282,26 @@ internal class SpecialTokenFilter(
 ) {
     private val buffer = StringBuilder()
 
+    // 스트림 시작부 인사말 제거용 상태
+    private val leadingBuffer = StringBuilder()
+    private var leadingResolved = false
+
     fun feed(text: String): String {
         if (text.isEmpty()) return ""
         buffer.append(text)
         removeCompleteTokens()
 
         val hold = holdbackLength()
-        if (hold == 0) {
-            val output = buffer.toString()
+        val output = if (hold == 0) {
+            val all = buffer.toString()
             buffer.clear()
-            return output
+            all
+        } else {
+            val out = buffer.substring(0, buffer.length - hold)
+            buffer.delete(0, buffer.length - hold)
+            out
         }
-        val output = buffer.substring(0, buffer.length - hold)
-        buffer.delete(0, buffer.length - hold)
-        return output
+        return filterLeadingGreeting(output)
     }
 
     fun flush(): String {
@@ -303,8 +309,52 @@ internal class SpecialTokenFilter(
         val remaining = buffer.toString()
         buffer.clear()
         // 불완전한 특수 토큰 접두사만 남았다면 노출하지 않습니다.
-        if (remaining.length >= 2 && tokens.any { it.startsWith(remaining) }) return ""
-        return remaining
+        val safe = if (remaining.length >= 2 && tokens.any { it.startsWith(remaining) }) "" else remaining
+        return filterLeadingGreeting(safe) + resolveLeadingOnFlush()
+    }
+
+    /**
+     * 스트림 시작부의 AI 인사말/자기소개를 제거합니다.
+     * 인사말 여부가 확정될 때까지 선두 텍스트를 보류했다가 판정 후 방출합니다.
+     */
+    private fun filterLeadingGreeting(text: String): String {
+        if (leadingResolved) return text
+        if (text.isNotEmpty()) leadingBuffer.append(text)
+        val current = leadingBuffer.toString()
+
+        // 완전한 인사말로 시작하면 제거
+        for (pattern in GREETING_PATTERNS) {
+            if (current.startsWith(pattern)) {
+                val rest = current.substring(pattern.length).trimStart()
+                leadingBuffer.clear()
+                leadingResolved = true
+                return rest
+            }
+        }
+
+        // 아직 인사말의 일부일 가능성이 있으면 계속 보류
+        val couldBeGreeting = GREETING_PATTERNS.any { it.startsWith(current) || current.startsWith(it) }
+        if (couldBeGreeting && current.length <= MAX_GREETING_LENGTH) return ""
+
+        // 인사말이 아님 → 그대로 방출
+        leadingBuffer.clear()
+        leadingResolved = true
+        return current
+    }
+
+    /** 스트림이 인사말 판정 전에 끝난 경우 보류분을 정리해 방출합니다. */
+    private fun resolveLeadingOnFlush(): String {
+        if (leadingResolved) return ""
+        var result = leadingBuffer.toString()
+        leadingBuffer.clear()
+        leadingResolved = true
+        for (pattern in GREETING_PATTERNS) {
+            if (result.startsWith(pattern)) {
+                result = result.substring(pattern.length).trimStart()
+                break
+            }
+        }
+        return result
     }
 
     private fun removeCompleteTokens() {
@@ -348,5 +398,17 @@ internal class SpecialTokenFilter(
             "<|im_start|>",
             "<|im_end|>"
         )
+
+        /** 스트림 시작부에서 잘라내야 할 AI 인사말/자기소개 패턴 (긴 것부터). */
+        val GREETING_PATTERNS = listOf(
+            "안녕하세요! 저는 MyAITutor의 과목별 문제 학습 도우미입니다.",
+            "안녕하세요! 저는 MyAITutor의 과목별 문제 학습 도우미",
+            "안녕하세요! 저는 MyAITutor",
+            "안녕하세요! 저는",
+            "안녕하세요!"
+        )
+
+        /** 인사말 판정을 위해 보류할 최대 글자 수. */
+        const val MAX_GREETING_LENGTH = 80
     }
 }

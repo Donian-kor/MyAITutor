@@ -9,6 +9,7 @@ import com.donian.myaitutor.ai.DEFAULT_THINKING_TOKEN_BUDGET
 import com.donian.myaitutor.ai.TutorGrade
 import com.donian.myaitutor.ai.analyzeImagePrompt
 import com.donian.myaitutor.ai.followUpPrompt
+import com.donian.myaitutor.ai.standaloneQuestionPrompt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
@@ -34,7 +35,8 @@ data class TutorRequest(
     val text: String,
     val subject: String,
     val grade: TutorGrade,
-    val options: InferenceOptions
+    val options: InferenceOptions,
+    val isStandaloneQuestion: Boolean = false
 )
 
 /** 학년별 Thinking/출력 토큰 설정을 한 곳에서 만듭니다. */
@@ -72,17 +74,19 @@ class RealGemmaTutorEngine(
 ) : LlmInferenceEngine {
 
     override fun stream(request: TutorRequest): Flow<TutorStreamChunk> = flow {
-        val textParts = if (request.options.isFollowUp) {
-            listOf(followUpPrompt(request.text, request.grade))
-        } else {
-            listOf(
+        val textParts = when {
+            request.options.isFollowUp && !request.isStandaloneQuestion ->
+                listOf(followUpPrompt(request.text, request.subject, request.grade))
+            request.isStandaloneQuestion ->
+                listOf(standaloneQuestionPrompt(request.text, request.subject, request.grade))
+            else -> listOf(
                 "[OCR 인식 텍스트]\n${request.text}",
                 analyzeImagePrompt(request.subject, request.grade)
             )
         }
         val assistantRequest = AssistantRequest(
             textParts = textParts,
-            startsNewProblem = !request.options.isFollowUp,
+            startsNewProblem = request.isStandaloneQuestion || !request.options.isFollowUp,
             options = AssistantStreamOptions(
                 maxOutputTokens = request.options.maxOutputTokens,
                 thinkingEnabled = request.options.thinkingEnabled,
@@ -153,6 +157,9 @@ class FakeGemmaTutorEngine(
     /** 테스트에서 스트림을 원하는 시점까지 붙잡아 둘 때 사용합니다. */
     var gate: CompletableDeferred<Unit>? = null
 
+    /** 테스트에서 취소 확인을 원하는 시점까지 지연시킬 때 사용합니다. */
+    var stopGate: CompletableDeferred<Unit>? = null
+
     @Volatile
     var streaming: Boolean = false
         private set
@@ -175,7 +182,10 @@ class FakeGemmaTutorEngine(
         cancelCalls++
     }
 
-    override suspend fun awaitGenerationStopped(timeoutMillis: Long): Boolean = awaitStoppedResult
+    override suspend fun awaitGenerationStopped(timeoutMillis: Long): Boolean {
+        stopGate?.await()
+        return awaitStoppedResult
+    }
 
     override suspend fun resetConversation() {
         resetConversationCalls++

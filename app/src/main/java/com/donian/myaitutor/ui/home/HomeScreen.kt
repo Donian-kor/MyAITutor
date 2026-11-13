@@ -173,12 +173,12 @@ internal fun HomeScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // AI 선생님 아바타 (앱 아이콘)
-                        TeacherAvatar(size = 44)
+                        // 앱 아이콘 - 배경 스페이서 없이 헤더 높이에 맞게 확대
+                        TeacherAvatar(size = 48)
 
                         // 문제 풀이 제목 + 토큰 수
                         Column(modifier = Modifier.weight(1f)) {
@@ -389,6 +389,8 @@ internal fun HomeScreen(
                             inputFocusRequester = inputFocusRequester,
                             keyboardController = keyboardController,
                             messages = messages,
+                            selectedSubject = selectedSubject,
+                            onOpenCamera = onOpenCamera,
                             modifier = Modifier.weight(1f)
                         )
 

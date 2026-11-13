@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -23,9 +24,10 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.StopCircle
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -52,6 +54,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.SoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -98,6 +101,8 @@ internal fun TutorResultScreen(
     inputFocusRequester: FocusRequester,
     keyboardController: SoftwareKeyboardController?,
     messages: List<ChatMessage>,
+    selectedSubject: String = "",
+    onOpenCamera: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var progressExpanded by remember { mutableStateOf(false) }
@@ -144,7 +149,7 @@ internal fun TutorResultScreen(
                 .verticalScroll(answerScrollState),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (ocrText.isNotBlank() || preprocessedImage != null) {
+            if (preprocessedImage != null) {
                 OcrTextDisclosure(text = ocrText, imageFile = preprocessedImage)
             }
 
@@ -153,7 +158,7 @@ internal fun TutorResultScreen(
                 messages.forEach { message ->
                     when (message.role) {
                         ChatRole.TEACHER -> {
-                            TeacherMessageBubble {
+                            TeacherMessageBubble(subject = selectedSubject) {
                                 SelectionContainer {
                                     AssistantAnswer(
                                         text = message.text,
@@ -173,9 +178,23 @@ internal fun TutorResultScreen(
                         }
                     }
                 }
+                if (isAnalyzing) {
+                    if (answer.isNotBlank()) {
+                        TeacherMessageBubble(subject = selectedSubject) {
+                            SelectionContainer {
+                                AssistantAnswer(
+                                    text = answer,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    } else {
+                        TypingIndicator(subject = selectedSubject)
+                    }
+                }
             } else if (answer.isNotBlank()) {
                 // 스트리밍 중인 답변 (아직 messages로 이동 전)
-                TeacherMessageBubble {
+                TeacherMessageBubble(subject = selectedSubject) {
                     SelectionContainer {
                         AssistantAnswer(
                             text = answer,
@@ -184,25 +203,14 @@ internal fun TutorResultScreen(
                     }
                 }
             } else if (isAnalyzing) {
-                TypingIndicator()
+                TypingIndicator(subject = selectedSubject)
             } else {
                 EmptyAnswerPlaceholder(
                     capturedImageAvailable = capturedImageAvailable,
                     modelReady = modelReady,
-                    onOpenSettings = onOpenSettings
+                    onOpenSettings = onOpenSettings,
+                    onOpenCamera = onOpenCamera
                 )
-            }
-
-            // 스트리밍 중일 때도 기존 answer 표시
-            if (messages.isEmpty() && answer.isNotBlank() && isAnalyzing) {
-                TeacherMessageBubble {
-                    SelectionContainer {
-                        AssistantAnswer(
-                            text = answer,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
             }
 
             FollowUpChips(
@@ -407,20 +415,21 @@ private fun ProgressDetails(messages: List<String>) {
 private fun EmptyAnswerPlaceholder(
     capturedImageAvailable: Boolean,
     modelReady: Boolean,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenCamera: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .fillMaxHeight()
             .padding(vertical = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            Icons.Default.Lightbulb,
-            contentDescription = null,
-            tint = Color(0xFFB48A35),
-            modifier = Modifier.size(34.dp)
+        Image(
+            painter = painterResource(R.drawable.robot_tutor),
+            contentDescription = stringResource(R.string.content_desc_ai_helper),
+            modifier = Modifier.size(48.dp)
         )
         Spacer(Modifier.height(8.dp))
         Text(
@@ -445,6 +454,22 @@ private fun EmptyAnswerPlaceholder(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp)
         )
+        // 모델 준비 시 촬영 버튼 표시
+        if (modelReady && !capturedImageAvailable) {
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = onOpenCamera,
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+            ) {
+                Icon(
+                    Icons.Default.CameraAlt,
+                    contentDescription = stringResource(R.string.content_desc_take_photo),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.btn_take_photo))
+            }
+        }
         if (!modelReady) {
             TextButton(onClick = onOpenSettings) {
                 Icon(
@@ -459,49 +484,52 @@ private fun EmptyAnswerPlaceholder(
 }
 
 @Composable
-private fun OcrTextDisclosure(text: String, imageFile: File?) {
-    var expanded by remember(text, imageFile) { mutableStateOf(false) }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
+private fun OcrTextDisclosure(text: String, imageFile: File) {
+    var expanded by remember(imageFile) { mutableStateOf(false) }
+    val preview by produceState<ImageBitmap?>(initialValue = null, imageFile) {
+        value = withContext(Dispatchers.IO) { decodeOcrPreview(imageFile) }
+    }
+    val bitmap = preview ?: return
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Image(
+            bitmap = bitmap,
+            contentDescription = stringResource(
+                if (expanded) R.string.home_ocr_hide else R.string.home_ocr_show
+            ),
+            modifier = Modifier
+                .size(72.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { expanded = !expanded },
+            contentScale = ContentScale.Fit
         )
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
-            TextButton(
-                onClick = { expanded = !expanded },
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+        if (expanded) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
             ) {
-                Text(
-                    stringResource(if (expanded) R.string.home_ocr_hide else R.string.home_ocr_show),
-                    modifier = Modifier.weight(1f),
-                    fontWeight = FontWeight.SemiBold
-                )
-                Icon(
-                    Icons.Default.ArrowDropDown,
-                    contentDescription = null,
-                    modifier = Modifier.graphicsLayer(rotationZ = if (expanded) 180f else 0f)
-                )
-            }
-            Text(
-                stringResource(R.string.home_ocr_explanation),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-            if (expanded) {
-                if (imageFile != null) {
-                    OcrInputImagePreview(imageFile)
-                }
-                if (text.isNotBlank()) {
-                    SelectionContainer {
-                        Text(
-                            text,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.padding(8.dp)
-                        )
+                Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                    Text(
+                        stringResource(R.string.home_ocr_explanation),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                    OcrInputImagePreview(bitmap)
+                    if (text.isNotBlank()) {
+                        SelectionContainer {
+                            Text(
+                                text,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -510,19 +538,8 @@ private fun OcrTextDisclosure(text: String, imageFile: File?) {
 }
 
 @Composable
-private fun OcrInputImagePreview(imageFile: File) {
-    val preview by produceState<ImageBitmap?>(initialValue = null, imageFile) {
-        value = withContext(Dispatchers.IO) { decodeOcrPreview(imageFile) }
-    }
-    val bitmap = preview ?: return
+private fun OcrInputImagePreview(bitmap: ImageBitmap) {
     Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
-        Text(
-            stringResource(R.string.ocr_preprocessed_image_title),
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSecondaryContainer
-        )
-        Spacer(Modifier.height(6.dp))
         Image(
             bitmap = bitmap,
             contentDescription = stringResource(R.string.ocr_preprocessed_image_title),

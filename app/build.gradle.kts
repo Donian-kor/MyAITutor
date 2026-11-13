@@ -27,9 +27,15 @@ android {
         applicationId = "com.donian.myaitutor"
         minSdk = 26
         targetSdk = 36
-        // 커밋이 추가되면 Android versionCode와 표시 버전이 함께 증가합니다.
+        // 커밋이 추가되면 versionCode와 표시 버전이 함께 증가합니다. 별도 관리가 필요 없습니다.
+        // 커밋 수를 MAJOR.MINOR.PATCH로 풀어 100번째 커밋에서 1.0.0이 됩니다.
+        // 예: 89 → 0.8.9, 99 → 0.9.9, 100 → 1.0.0, 105 → 1.0.5
         versionCode = gitCommitCount
-        versionName = "0.${gitCommitCount / 10}.${gitCommitCount % 10}"
+        versionName = "%d.%d.%d".format(
+            gitCommitCount / 100,
+            (gitCommitCount % 100) / 10,
+            gitCommitCount % 10
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

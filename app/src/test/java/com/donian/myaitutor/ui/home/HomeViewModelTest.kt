@@ -6,7 +6,6 @@ import com.donian.myaitutor.ai.Assistant
 import com.donian.myaitutor.ai.AssistantRequest
 import com.donian.myaitutor.ai.AssistantStreamEvent
 import com.donian.myaitutor.ai.TutorGrade
-import com.donian.myaitutor.ai.followUpAnswerPrefix
 import com.donian.myaitutor.model.ModelDownloadRepository
 import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelDownloadStatus
@@ -86,7 +85,11 @@ class HomeViewModelTest {
             onTextChanged("분석 결과")
         }
 
-        override suspend fun askFollowUp(question: String, onTextChanged: suspend (String) -> Unit) {
+        override suspend fun askFollowUp(
+            question: String,
+            subject: String,
+            onTextChanged: suspend (String) -> Unit
+        ) {
             streamCalls++
             onTextChanged("후속 답변")
         }
@@ -221,17 +224,17 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `중등 이상은 Thinking을 켜고 유아와 초등은 끈다`() = runTest {
+    fun `중등 이상은 Thinking을 켜고 초등은 끈다`() = runTest {
         val engine = FakeGemmaTutorEngine()
         val (vm, _) = createViewModel(this, engine = engine)
         val file = File.createTempFile("img", ".jpg")
 
-        vm.selectGrade(TutorGrade.KIDS)
+        vm.selectGrade(TutorGrade.ELEMENTARY)
         vm.analyzeImage(file, "수학")
         advanceUntilIdle()
-        val kidsOptions = engine.requests.last().options
-        assertFalse(kidsOptions.thinkingEnabled)
-        assertEquals(0, kidsOptions.thinkingTokenBudget)
+        val elementaryOptions = engine.requests.last().options
+        assertFalse(elementaryOptions.thinkingEnabled)
+        assertEquals(0, elementaryOptions.thinkingTokenBudget)
 
         vm.selectGrade(TutorGrade.HIGH)
         vm.analyzeImage(file, "수학")
@@ -244,22 +247,46 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `후속 질문은 이전 답변 뒤에 이어 붙이고 isFollowUp을 설정한다`() = runTest {
+    fun `후속 질문은 이전 답변을 이어 붙이지 않고 새 답변만 표시한다`() = runTest {
         val engine = FakeGemmaTutorEngine()
         val (vm, _) = createViewModel(this, engine = engine)
         val file = File.createTempFile("img", ".jpg")
 
         vm.analyzeImage(file, "수학")
         advanceUntilIdle()
-        val firstAnswer = vm.state.value.answer
+        assertTrue(vm.state.value.answer.isNotBlank())
 
         vm.sendQuestion("왜 그런가요?")
         advanceUntilIdle()
 
-        val expectedPrefix = followUpAnswerPrefix(firstAnswer, "왜 그런가요?")
-        assertEquals(expectedPrefix + "테스트 해설", vm.state.value.answer)
+        // 채팅은 messages 목록의 개별 버블로 표시하므로 answer에는 새 답변만 담깁니다.
+        assertEquals("테스트 해설", vm.state.value.answer)
+        assertTrue(
+            vm.state.value.messages.any {
+                it.role == ChatRole.STUDENT && it.text == "왜 그런가요?"
+            }
+        )
         assertTrue(engine.requests.last().options.isFollowUp)
         assertEquals("왜 그런가요?", engine.requests.last().text)
+        file.delete()
+    }
+
+    @Test
+    fun `과목을 바꾼 뒤 입력한 질문은 새 과목의 독립 질문으로 보낸다`() = runTest {
+        val engine = FakeGemmaTutorEngine()
+        val (vm, _) = createViewModel(this, engine = engine)
+        val file = File.createTempFile("img", ".jpg")
+
+        vm.analyzeImage(file, "수학")
+        advanceUntilIdle()
+        vm.resetForNewSubject()
+        vm.sendQuestion("조선 시대 세종의 업적을 알려줘", subject = "역사")
+        advanceUntilIdle()
+
+        val request = engine.requests.last()
+        assertEquals("역사", request.subject)
+        assertTrue(request.isStandaloneQuestion)
+        assertEquals("조선 시대 세종의 업적을 알려줘", request.text)
         file.delete()
     }
 
@@ -305,6 +332,30 @@ class HomeViewModelTest {
         gate.complete(Unit)
         advanceUntilIdle()
         assertEquals("", vm.state.value.answer)
+        file.delete()
+    }
+
+    @Test
+    fun `생성 중지 후 새 질문을 보내면 AI가 응답한다`() = runTest {
+        val engine = FakeGemmaTutorEngine().apply {
+            gate = CompletableDeferred()
+        }
+        val (vm, _) = createViewModel(this, engine = engine)
+        val file = File.createTempFile("img", ".jpg")
+
+        vm.analyzeImage(file, "수학")
+        advanceUntilIdle()
+        vm.cancelGeneration()
+        advanceUntilIdle()
+
+        assertFalse(vm.state.value.isAnalyzing)
+        engine.gate = null
+        vm.sendQuestion("이 문제에서 핵심 개념은 무엇인가요?")
+        advanceUntilIdle()
+
+        assertEquals(2, engine.requests.size)
+        assertTrue(vm.state.value.answer.contains("테스트 해설"))
+        assertFalse(vm.state.value.isAnalyzing)
         file.delete()
     }
 
@@ -406,6 +457,84 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `답변 중 취소한 뒤 입력한 질문은 다시 추론을 시작한다`() = runTest {
+        val engine = FakeGemmaTutorEngine()
+        val (vm, _) = createViewModel(this, engine = engine)
+        val file = File.createTempFile("img", ".jpg")
+
+        val gate = CompletableDeferred<Unit>()
+        engine.gate = gate
+        vm.analyzeImage(file, "수학")
+        advanceUntilIdle()
+        assertEquals(1, engine.requests.size)
+
+        vm.cancelGeneration()
+        advanceUntilIdle()
+        gate.complete(Unit)
+        advanceUntilIdle()
+        engine.gate = null
+        assertFalse(vm.state.value.isAnalyzing)
+
+        vm.sendQuestion("왜 그런가요?")
+        advanceUntilIdle()
+
+        assertEquals(2, engine.requests.size)
+        assertTrue(vm.state.value.messages.any { it.text == "테스트 해설" })
+        file.delete()
+    }
+
+    @Test
+    fun `취소가 확인되면 대화 세션을 새로 만든다`() = runTest {
+        val engine = FakeGemmaTutorEngine()
+        val (vm, _) = createViewModel(this, engine = engine)
+        val file = File.createTempFile("img", ".jpg")
+
+        val gate = CompletableDeferred<Unit>()
+        engine.gate = gate
+        vm.analyzeImage(file, "수학")
+        advanceUntilIdle()
+        assertEquals(0, engine.resetConversationCalls)
+
+        vm.cancelGeneration()
+        advanceUntilIdle()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, engine.resetConversationCalls)
+        file.delete()
+    }
+
+    @Test
+    fun `취소 확인 중에 입력한 질문은 취소가 끝나면 자동 전송된다`() = runTest {
+        val engine = FakeGemmaTutorEngine()
+        val (vm, _) = createViewModel(this, engine = engine)
+        val file = File.createTempFile("img", ".jpg")
+
+        val streamGate = CompletableDeferred<Unit>()
+        val stopGate = CompletableDeferred<Unit>()
+        engine.gate = streamGate
+        engine.stopGate = stopGate
+        vm.analyzeImage(file, "수학")
+        advanceUntilIdle()
+        assertEquals(1, engine.requests.size)
+
+        vm.cancelGeneration()
+        advanceUntilIdle()
+        // 아직 취소가 확인되지 않아 추론을 시작할 수 없습니다.
+        vm.sendQuestion("왜 그런가요?")
+        advanceUntilIdle()
+        assertEquals(1, engine.requests.size)
+
+        stopGate.complete(Unit)
+        streamGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(2, engine.requests.size)
+        assertEquals("왜 그런가요?", engine.requests.last().text)
+        file.delete()
+    }
+
+    @Test
     fun `RealGemmaTutorEngine은 OCR 텍스트와 학년 지침을 프롬프트로 구성한다`() = runTest {
         val assistant = FakeAssistant()
         val engine = RealGemmaTutorEngine(assistant)
@@ -446,6 +575,104 @@ class HomeViewModelTest {
         assertTrue(assistantRequest.textParts.single().contains("왜 그런가요?"))
         assertFalse(assistantRequest.options.thinkingEnabled)
         assertEquals(0, assistantRequest.options.thinkingTokenBudget)
+    }
+
+    @Test
+    fun `새 과목의 자유 질문은 이전 Conversation을 초기화하고 과목 지침을 포함한다`() = runTest {
+        val assistant = FakeAssistant()
+        val engine = RealGemmaTutorEngine(assistant)
+        val request = TutorRequest(
+            text = "조선 시대 세종의 업적을 알려줘",
+            subject = "역사",
+            grade = TutorGrade.MIDDLE,
+            options = inferenceOptionsFor(TutorGrade.MIDDLE, isFollowUp = true),
+            isStandaloneQuestion = true
+        )
+
+        engine.stream(request).toList()
+
+        val assistantRequest = requireNotNull(assistant.lastRequest)
+        assertTrue(assistantRequest.startsNewProblem)
+        assertTrue(assistantRequest.textParts.single().contains("선택 과목: 역사"))
+        assertTrue(assistantRequest.textParts.single().contains("조선 시대 세종의 업적을 알려줘"))
+    }
+
+    @Test
+    fun `수학 문제 분석 프롬프트는 수학 지침과 LaTeX 표기 규칙을 포함한다`() = runTest {
+        val assistant = FakeAssistant()
+        val engine = RealGemmaTutorEngine(assistant)
+        val request = TutorRequest(
+            text = "이차방정식을 풀어라",
+            subject = "수학",
+            grade = TutorGrade.MIDDLE,
+            options = inferenceOptionsFor(TutorGrade.MIDDLE, isFollowUp = false)
+        )
+
+        engine.stream(request).toList()
+
+        val prompt = requireNotNull(assistant.lastRequest).textParts.last()
+        assertTrue(prompt.contains("선택 과목: 수학"))
+        assertTrue(prompt.contains("풀이 단계마다 근거를 밝히고, 마지막에 답을 검산"))
+        assertTrue(prompt.contains("[수식 표기]"))
+        assertTrue(prompt.contains("\\frac{a}{b}"))
+    }
+
+    @Test
+    fun `사회 문제 분석 프롬프트에는 LaTeX 표기 규칙이 없다`() = runTest {
+        val assistant = FakeAssistant()
+        val engine = RealGemmaTutorEngine(assistant)
+        val request = TutorRequest(
+            text = "조선 후기 신분제 변화를 설명해라",
+            subject = "사회",
+            grade = TutorGrade.MIDDLE,
+            options = inferenceOptionsFor(TutorGrade.MIDDLE, isFollowUp = false)
+        )
+
+        engine.stream(request).toList()
+
+        val prompt = requireNotNull(assistant.lastRequest).textParts.last()
+        assertTrue(prompt.contains("선택 과목: 사회"))
+        assertTrue(prompt.contains("배경과 인과 관계"))
+        assertFalse(prompt.contains("[수식 표기]"))
+        assertFalse(prompt.contains("\\frac{a}{b}"))
+    }
+
+    @Test
+    fun `후속 질문 프롬프트는 선택 과목 지침을 포함한다`() = runTest {
+        val assistant = FakeAssistant()
+        val engine = RealGemmaTutorEngine(assistant)
+        val request = TutorRequest(
+            text = "왜 그런가요?",
+            subject = "영어",
+            grade = TutorGrade.MIDDLE,
+            options = inferenceOptionsFor(TutorGrade.MIDDLE, isFollowUp = true)
+        )
+
+        engine.stream(request).toList()
+
+        val prompt = requireNotNull(assistant.lastRequest).textParts.single()
+        assertTrue(prompt.contains("선택 과목: 영어"))
+        assertTrue(prompt.contains("문법·어휘 근거"))
+        assertFalse(assistant.lastRequest?.startsNewProblem == true)
+    }
+
+    @Test
+    fun `목록에 없는 과목은 기본 과목 지침을 사용한다`() = runTest {
+        val assistant = FakeAssistant()
+        val engine = RealGemmaTutorEngine(assistant)
+        val request = TutorRequest(
+            text = "한자 급수 시험 범위를 알려줘",
+            subject = "한자",
+            grade = TutorGrade.MIDDLE,
+            options = inferenceOptionsFor(TutorGrade.MIDDLE, isFollowUp = true),
+            isStandaloneQuestion = true
+        )
+
+        engine.stream(request).toList()
+
+        val prompt = requireNotNull(assistant.lastRequest).textParts.single()
+        assertTrue(prompt.contains("선택 과목: 한자"))
+        assertTrue(prompt.contains("선택 과목에 맞춰 설명의 초점을 정하고"))
     }
 
     @Test

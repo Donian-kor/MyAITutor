@@ -201,12 +201,15 @@ class GemmaAssistant(context: Context) : Assistant {
 
     override suspend fun askFollowUp(
         question: String,
+        subject: String,
         onTextChanged: suspend (String) -> Unit
     ) {
         require(question.isNotBlank()) { "질문 내용을 입력해 주세요." }
         collectLegacy(
             request = AssistantRequest(
-                textParts = listOf(followUpPrompt(question, TutorGrade.ELEMENTARY)),
+                textParts = listOf(
+                    followUpPrompt(question, subject, TutorGrade.ELEMENTARY)
+                ),
                 startsNewProblem = false
             ),
             onTextChanged = onTextChanged

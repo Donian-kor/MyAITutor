@@ -6,7 +6,6 @@ import com.donian.myaitutor.R
 import com.donian.myaitutor.ai.Assistant
 import com.donian.myaitutor.ai.GemmaAssistant
 import com.donian.myaitutor.ai.TutorGrade
-import com.donian.myaitutor.ai.followUpAnswerPrefix
 import com.donian.myaitutor.camera.ImageCropper
 import com.donian.myaitutor.camera.ImageSelection
 import com.donian.myaitutor.model.ModelDownloadManager
@@ -93,6 +92,12 @@ class HomeViewModel(
     /** 후속 질문 요청에 사용할 마지막 과목. 과목 상태 자체는 화면이 소유합니다. */
     private var lastSubject: String = ""
 
+    /**
+     * 취소 확인 중에는 새 추론을 시작할 수 없어 보관해 둔 질문.
+     * 취소가 확정되면 자동으로 전송합니다.
+     */
+    private var queuedQuestion: String? = null
+
     private val tutorParser = TutorStreamParser()
 
     init {
@@ -172,6 +177,7 @@ class HomeViewModel(
         generationJob = null
         generationId++
         userCancelledGeneration = null
+        lastSubject = ""
         tutorParser.reset()
         // 이전 캡처 이미지는 삭제 (과목 변경 시)
         _state.value.capturedImage?.let { file ->
@@ -397,8 +403,17 @@ class HomeViewModel(
         }
     }
 
-    fun sendQuestion(question: String, showChoicesAfterResponse: Boolean = false) {
-        if (question.isBlank() || _state.value.isAnalyzing) return
+    fun sendQuestion(
+        question: String,
+        subject: String = lastSubject.ifBlank { "기타" },
+        showChoicesAfterResponse: Boolean = false
+    ) {
+        if (question.isBlank()) return
+        if (_state.value.isAnalyzing) {
+            // 취소가 확인되지 않은 동안은 추론을 시작할 수 없으므로 보관해 두었다가 자동 전송합니다.
+            if (_state.value.tutorState.isCancelling) queuedQuestion = question
+            return
+        }
         if (_state.value.tutorState.requiresRecovery) {
             _state.value = _state.value.copy(
                 statusMessage = _state.value.tutorState.errorMessage
@@ -412,6 +427,8 @@ class HomeViewModel(
             return
         }
 
+        val isStandaloneQuestion = lastSubject != subject
+        lastSubject = subject
         val currentGeneration = ++generationId
         userCancelledGeneration = null
         tutorParser.reset()
@@ -435,9 +452,10 @@ class HomeViewModel(
                 val grade = _state.value.selectedGrade
                 val request = TutorRequest(
                     text = question,
-                    subject = lastSubject.ifBlank { "기타" },
+                    subject = subject,
                     grade = grade,
-                    options = inferenceOptionsFor(grade, isFollowUp = true)
+                    options = inferenceOptionsFor(grade, isFollowUp = true),
+                    isStandaloneQuestion = isStandaloneQuestion
                 )
                 _state.value = _state.value.copy(tutorState = tutorParser.onAnalysisStarted())
                 receivedAnswer = collectTutorStream(request, currentGeneration)
@@ -557,7 +575,7 @@ class HomeViewModel(
     }
 
     /**
-     * 사용자 중단. 네이티브 취소 완료를 확인한 뒤에만 수집 Job을 정리합니다.
+     * 사용자 중단. 네이티브 취소를 요청하고, 종료 확인 즉시 이전 세대를 무효화합니다.
      * 완료를 확인하지 못하면 새 추론을 금지하고 복구 상태로 전환합니다.
      */
     fun cancelGeneration() {
@@ -576,10 +594,24 @@ class HomeViewModel(
             val confirmed = tutorEngine.awaitGenerationStopped(CANCEL_CONFIRM_TIMEOUT_MS)
             if (currentGeneration != generationId) return@launch
             if (confirmed) {
-                // finally가 취소 상태와 isAnalyzing=false를 복구합니다.
+                generationId++
+                userCancelledGeneration = null
                 job.cancel()
+                // 취소된 네이티브 Conversation은 후속 요청에 답하지 않으므로 새로 만듭니다.
+                runCatching { tutorEngine.resetConversation() }
+                _state.value = _state.value.copy(
+                    isAnalyzing = false,
+                    analysisStage = null,
+                    tutorState = tutorParser.onCancellationConfirmed()
+                )
+                generationJob = null
+                // 취소 대기 중에 입력된 질문을 이어서 처리합니다.
+                val queued = queuedQuestion
+                queuedQuestion = null
+                if (queued != null) sendQuestion(queued)
             } else {
                 // 안전하지 않은 상태에서는 다음 추론을 시작하지 않습니다.
+                queuedQuestion = null
                 generationId++
                 job.cancel()
                 _state.value = _state.value.copy(

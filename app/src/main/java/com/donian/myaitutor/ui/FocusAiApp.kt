@@ -179,8 +179,17 @@ fun FocusAiApp(host: HomeViewModelHost) {
                 uiState.capturedImage?.let { viewModel.analyzeImage(it, selectedSubject) }
             },
             canRetryAnalysis = uiState.capturedImage != null && !uiState.isAnalyzing,
-            onSend = { viewModel.sendQuestion(uiState.inputText); focusManager.clearFocus() },
-            onSendChoice = { prompt -> viewModel.sendQuestion(prompt, showChoicesAfterResponse = true) },
+            onSend = {
+                viewModel.sendQuestion(uiState.inputText, selectedSubject)
+                focusManager.clearFocus()
+            },
+            onSendChoice = { prompt ->
+                viewModel.sendQuestion(
+                    prompt,
+                    selectedSubject,
+                    showChoicesAfterResponse = true
+                )
+            },
             showFollowUpChoices = uiState.showFollowUpChoices,
             onCancelGeneration = { viewModel.cancelGeneration() },
             selectedGrade = uiState.selectedGrade,

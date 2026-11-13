@@ -88,10 +88,10 @@
 
     <!-- 홈 화면 -->
     <string name="app_title">나만의 AI쌤</string>
-    <string name="home_title_generator">문제 풀이</string>
+    <string name="home_title_generator">나만의 AI쌤</string>
     <string name="home_stage_ocr">사진에서 글자를 읽는 중 · PaddleOCR</string>
     <string name="home_stage_ocr_detail">PaddleOCR이 사진 속 글자를 인식하고 있습니다.</string>
-    <string name="home_stage_gemma">문제 풀이 중 · Gemma 4 E4B</string>
+    <string name="home_stage_gemma">나만의 AI쌤 · Gemma 4 E4B</string>
     <string name="home_stage_gemma_detail">PaddleOCR이 읽은 텍스트를 Gemma 4 E4B에 전달해 풀이하고 있습니다.</string>
     <string name="home_ocr_show">PaddleOCR 인식 내용 보기</string>
     <string name="home_ocr_hide">PaddleOCR 인식 내용 숨기기</string>
@@ -118,6 +118,7 @@
     <string name="content_desc_send_question">질문 보내기</string>
 
     <!-- 실시간 AI 선생님 -->
+    <string name="btn_take_photo">사진 촬영</string>
     <string name="tutor_btn_stop">중단</string>
     <string name="tutor_btn_recover">새 대화로 복구</string>
     <string name="tutor_completed_status">✓ 풀이 완성 (눌러서 풀이 진행 내역 보기)</string>

@@ -26,10 +26,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -146,8 +144,7 @@ fun ModelLoadingScreen(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(vertical = 24.dp)
+                .padding(vertical = 16.dp)
         ) {
             // 선생님 아바타 + 후광 - 개선된 애니메이션
             AnimatedVisibility(
@@ -161,10 +158,10 @@ fun ModelLoadingScreen(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier.scale(avatarScale)
                 ) {
-                    // 외곽 후광 (더 큰 원, 더 부드러운 그라데이션)
+                    // 외곽 후광 (아이콘 크기에 비례)
                     Box(
                         modifier = Modifier
-                            .size(400.dp)
+                            .size(300.dp)
                             .alpha(haloAlpha * 0.5f)
                             .background(
                                 Brush.radialGradient(
@@ -179,7 +176,7 @@ fun ModelLoadingScreen(
                     // 중간 후광
                     Box(
                         modifier = Modifier
-                            .size(320.dp)
+                            .size(240.dp)
                             .alpha(haloAlpha * 0.8f)
                             .background(
                                 Brush.radialGradient(
@@ -191,12 +188,12 @@ fun ModelLoadingScreen(
                                 CircleShape
                             )
                     )
-                    // 아바타 서페이스 - 아이콘 이미지(180dp)보다 크게 유지
+                    // 아바타 서페이스 - 아이콘(180dp)보다 10dp 크게
                     Surface(
                         shape = shapes.extraLarge,
                         color = colors.surface,
                         shadowElevation = 20.dp,
-                        modifier = Modifier.size(240.dp)
+                        modifier = Modifier.size(190.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Image(
@@ -209,9 +206,8 @@ fun ModelLoadingScreen(
                 }
             }
 
-            Spacer(Modifier.height(40.dp))
-
-            // 선생님 말풍선 - 개선된 디자인
+            Spacer(Modifier.height(20.dp))
+            // 선생님 말풍선
             AnimatedVisibility(
                 visible = visible,
                 enter = fadeIn(animationSpec = tween(600, delayMillis = 200)) + slideInVertically(
@@ -226,7 +222,7 @@ fun ModelLoadingScreen(
                     modifier = Modifier.fillMaxWidth(0.9f)
                 ) {
                     Column(
-                        modifier = Modifier.padding(28.dp),
+                        modifier = Modifier.padding(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
@@ -251,7 +247,7 @@ fun ModelLoadingScreen(
                 }
             }
 
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(20.dp))
 
             // 진행 표시 영역
             AnimatedVisibility(
@@ -292,7 +288,7 @@ fun ModelLoadingScreen(
                 }
             }
 
-            Spacer(Modifier.height(44.dp))
+            Spacer(Modifier.height(24.dp))
 
             // 액션 버튼
             AnimatedVisibility(

@@ -51,7 +51,7 @@ data class HomeUiState(
     val backendLabel: String = "아직 모델이 실행되지 않았습니다.",
     val showFollowUpChoices: Boolean = false,
     val tokenCount: Int = 0,
-    val maxContextTokens: Int = 8000,
+    val maxContextTokens: Int = 2_048,
     val maxOutputTokens: Int = DEFAULT_MAX_OUTPUT_TOKENS,
     /** 학년의 단일 원본. 별도 ViewModel/저장소를 만들지 않습니다. */
     val selectedGrade: TutorGrade = TutorGrade.ELEMENTARY,

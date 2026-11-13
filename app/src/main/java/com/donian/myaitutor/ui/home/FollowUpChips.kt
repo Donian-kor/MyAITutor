@@ -18,8 +18,8 @@ import com.donian.myaitutor.ui.text.FormulaText
 
 /**
  * 첫 답변 뒤에 표시되는 맞춤형 후속 설명 선택 칩.
- * AI가 생성한 가변 개수(1~5개)의 맞춤 추천 질문 및 "직접 입력" 칩을 표시한다.
- * 선택지 내부의 인라인 LaTeX 수학 수식($...$)도 깔끔하게 렌더링한다.
+ * AI가 생성한 가변 개수(최대 4개)의 맞춤 추천 질문 및 "직접 입력" 칩을 표시한다.
+ * 선택지 내부의 인라인 LaTeX 수학 수식($...$)도 FormulaText로 렌더링한다.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

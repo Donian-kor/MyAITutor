@@ -5,9 +5,11 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import com.donian.myaitutor.R
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,71 +29,40 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-/**
- * AI 선생님 아바타 아이콘.
- * 채팅 메시지 옆에 표시하여 "AI 선생님"임을 시각적으로 전달합니다.
- */
 @Composable
 fun TeacherAvatar(
     modifier: Modifier = Modifier,
-    size: Int = 36,
-    isThinking: Boolean = false
+    size: Int = 36
 ) {
-    val haloAlpha = if (isThinking) {
-        val transition = rememberInfiniteTransition(label = "avatar-halo")
-        val animated by transition.animateFloat(
-            initialValue = 0.15f,
-            targetValue = 0.35f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 1_200),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "avatar-halo-alpha"
-        )
-        animated
-    } else {
-        0.2f
-    }
-
     Box(
         modifier = modifier.size(size.dp),
         contentAlignment = Alignment.Center
     ) {
-        // 후광
-        Box(
-            modifier = Modifier
-                .size((size + 8).dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = haloAlpha))
-        )
-        // 아바타 원
         Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primaryContainer,
             modifier = Modifier.size(size.dp)
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Image(
-                    painter = painterResource(R.drawable.robot_tutor),
-                    contentDescription = "AI 선생님",
-                    modifier = Modifier.size((size * 0.6f).dp)
-                )
-            }
+            Image(
+                painter = painterResource(R.drawable.ai_chat_icon),
+                contentDescription = "AI 선생님",
+                modifier = Modifier.padding((size * 0.05f).dp)
+            )
         }
     }
 }
 
 /**
  * AI 선생님 메시지 버블 - 개선된 디자인.
- * 답변 내용이 잘리지 않도록 충분한 여백 제공.
- * 배경색으로 AI 답변과 사용자 질문을 구분.
+ * 새 AI 채팅 아이콘 + "나만의 AI쌤 - 과목명" 라벨 표시.
+ * 흰색 배경 + 두꺼운 테두리로 학생 답변과 구분.
  */
 @Composable
 fun TeacherMessageBubble(
+    subject: String = "",
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -101,21 +71,41 @@ fun TeacherMessageBubble(
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.Top
     ) {
-        TeacherAvatar(size = 32)
+        // AI 채팅 아이콘
+        Image(
+            painter = painterResource(R.drawable.ai_chat_icon),
+            contentDescription = "AI 선생님",
+            modifier = Modifier.size(36.dp)
+        )
         Spacer(Modifier.width(10.dp))
-        Surface(
-            shape = RoundedCornerShape(
-                topStart = 6.dp,
-                topEnd = 18.dp,
-                bottomStart = 18.dp,
-                bottomEnd = 18.dp
-            ),
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            shadowElevation = 1.dp,
-            modifier = Modifier.weight(1f, fill = false)
-        ) {
-            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-                content()
+
+        // 아이콘 하단에서 시작하는 답변 카드
+        Column(modifier = Modifier.weight(1f, fill = false)) {
+            // 라벨: 나만의 AI쌤 - 과목명
+            if (subject.isNotBlank()) {
+                Text(
+                    text = "나만의 AI쌤 - $subject",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(
+                    topStart = 6.dp,
+                    topEnd = 18.dp,
+                    bottomStart = 18.dp,
+                    bottomEnd = 18.dp
+                ),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 1.dp,
+                border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                    content()
+                }
             }
         }
     }
@@ -159,50 +149,37 @@ fun UserMessageBubble(
  */
 @Composable
 fun TypingIndicator(
+    subject: String = "",
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.Start,
-        verticalAlignment = Alignment.CenterVertically
+    TeacherMessageBubble(
+        subject = subject,
+        modifier = modifier
     ) {
-        TeacherAvatar(size = 32, isThinking = true)
-        Spacer(Modifier.width(8.dp))
-        Surface(
-            shape = RoundedCornerShape(
-                topStart = 4.dp,
-                topEnd = 16.dp,
-                bottomStart = 16.dp,
-                bottomEnd = 16.dp
-            ),
-            color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 1.dp
+        Row(
+            modifier = Modifier.padding(vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val transition = rememberInfiniteTransition(label = "typing")
-                repeat(3) { index ->
-                    val animatedAlpha by transition.animateFloat(
-                        initialValue = 0.3f,
-                        targetValue = 1f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(durationMillis = 600, delayMillis = index * 200),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "dot-$index"
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(
-                                MaterialTheme.colorScheme.primary.copy(alpha = animatedAlpha)
-                            )
-                    )
-                }
+            val transition = rememberInfiniteTransition(label = "typing")
+            repeat(3) { index ->
+                val animatedAlpha by transition.animateFloat(
+                    initialValue = 0.3f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 600, delayMillis = index * 200),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "dot-$index"
+                )
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = animatedAlpha)
+                        )
+                )
             }
         }
     }

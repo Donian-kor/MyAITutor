@@ -51,7 +51,7 @@ interface Assistant {
 
     // 기존 호출부 호환 API. 스트리밍 API로도 동일한 요청을 수행할 수 있습니다.
     suspend fun analyzeImage(ocrText: String, subject: String, onTextChanged: suspend (String) -> Unit)
-    suspend fun askFollowUp(question: String, onTextChanged: suspend (String) -> Unit)
+    suspend fun askFollowUp(question: String, subject: String, onTextChanged: suspend (String) -> Unit)
     suspend fun backendLabel(): String
     suspend fun getTokenCount(): Int
     fun cancelGeneration()
