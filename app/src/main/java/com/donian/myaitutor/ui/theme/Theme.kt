@@ -1,48 +1,164 @@
 package com.donian.myaitutor.ui.theme
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
- * 나만의 AI 쌤 앱 테마.
+ * 나만의 AI 쌤 앱 테마 - 개선된 디자인.
  *
- * 따뜻하고 친근한 교실 느낌의 색상 팔레트를 사용합니다.
- * 파랑 계열을 기본으로 하되, 선생님의 따뜻함을 전달하기 위해
- * 부드러운 톤과 둥근 형태를 강조합니다.
+ * Figma 디자인 시안을 기반으로 개선된 색상 팔레트와 타이포그래피.
+ * - 더 세련된 파랑 계열 그라데이션
+ * - 개선된 명암비 (WCAG AA 준수)
+ * - 일관된 border radius 시스템
+ */
+private val LightColors = lightColorScheme(
+    // 기본 색상 - 신뢰감 있는 딥 블루
+    primary = Color(0xFF1565C0),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFD6E6FF),
+    onPrimaryContainer = Color(0xFF0A3D7A),
+
+    // 보조 색상 - 부드러운 스카이 블루
+    secondary = Color(0xFF4A90D9),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFE3F0FF),
+    onSecondaryContainer = Color(0xFF1A3A5C),
+
+    // 배경 - 따뜻한 아이보리 화이트
+    background = Color(0xFFF8FAFC),
+    onBackground = Color(0xFF1E293B),
+
+    // 서페이스 - 순백
+    surface = Color.White,
+    onSurface = Color(0xFF1E293B),
+    surfaceVariant = Color(0xFFF1F5F9),
+    onSurfaceVariant = Color(0xFF64748B),
+
+    // 윤곽선
+    outline = Color(0xFFCBD5E1),
+    outlineVariant = Color(0xFFE2E8F0),
+
+    // 오류
+    error = Color(0xFFDC2626),
+    errorContainer = Color(0xFFFEE2E2),
+    onErrorContainer = Color(0xFF991B1B),
+
+    // 성공 (모델 설치 완료 등)
+    tertiary = Color(0xFF16A34A),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFDCFCE7),
+    onTertiaryContainer = Color(0xFF14532D),
+
+    // 추가 역할 색상
+    scrim = Color.Black.copy(alpha = 0.32f),
+)
+
+private val AppShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(20.dp),
+    extraLarge = RoundedCornerShape(28.dp),
+)
+
+private val AppTypography = Typography(
+    // 헤드라인 - 큰 제목
+    headlineLarge = TextStyle(
+        fontWeight = FontWeight.Bold,
+        fontSize = 28.sp,
+        lineHeight = 36.sp,
+        letterSpacing = (-0.5).sp
+    ),
+    headlineMedium = TextStyle(
+        fontWeight = FontWeight.Bold,
+        fontSize = 24.sp,
+        lineHeight = 32.sp,
+        letterSpacing = (-0.25).sp
+    ),
+    headlineSmall = TextStyle(
+        fontWeight = FontWeight.Bold,
+        fontSize = 20.sp,
+        lineHeight = 28.sp
+    ),
+
+    // 타이틀 - 카드/섹션 제목
+    titleLarge = TextStyle(
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 18.sp,
+        lineHeight = 26.sp
+    ),
+    titleMedium = TextStyle(
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+        letterSpacing = 0.1.sp
+    ),
+    titleSmall = TextStyle(
+        fontWeight = FontWeight.Medium,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        letterSpacing = 0.1.sp
+    ),
+
+    // 바디 - 본문 텍스트
+    bodyLarge = TextStyle(
+        fontWeight = FontWeight.Normal,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+        letterSpacing = 0.5.sp
+    ),
+    bodyMedium = TextStyle(
+        fontWeight = FontWeight.Normal,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        letterSpacing = 0.25.sp
+    ),
+    bodySmall = TextStyle(
+        fontWeight = FontWeight.Normal,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.4.sp
+    ),
+
+    // 라벨 - 버튼/칩 텍스트
+    labelLarge = TextStyle(
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        letterSpacing = 0.1.sp
+    ),
+    labelMedium = TextStyle(
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.5.sp
+    ),
+    labelSmall = TextStyle(
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.5.sp
+    ),
+)
+
+/**
+ * 앱 테마 - 개선된 색상, 타이포그래피, 형태 시스템.
  */
 @Composable
 fun FocusAiTheme(content: @Composable () -> Unit) {
-    val colors = lightColorScheme(
-        // 기본 색상 - 선생님의 신뢰감 있는 파랑
-        primary = Color(0xFF2B6CB0),
-        onPrimary = Color.White,
-        primaryContainer = Color(0xFFDCE8F7),
-        onPrimaryContainer = Color(0xFF1A3A5C),
-        // 보조 색상 - 따뜻한 하늘색
-        secondary = Color(0xFF4A7FA5),
-        onSecondary = Color.White,
-        secondaryContainer = Color(0xFFE8F2F9),
-        onSecondaryContainer = Color(0xFF1E3A50),
-        // 배경 - 부드러운 아이보리 톤
-        background = Color(0xFFF7F9FC),
-        onBackground = Color(0xFF1A2332),
-        surface = Color.White,
-        onSurface = Color(0xFF1A2332),
-        onSurfaceVariant = Color(0xFF5A6B80),
-        // 윤곽선 - 부드러운 회색
-        outline = Color(0xFFB8C4D4),
-        outlineVariant = Color(0xFFDCE3EC),
-        // 오류 색상
-        error = Color(0xFFD93025),
-        errorContainer = Color(0xFFFCE8E6),
-        onErrorContainer = Color(0xFF8B1A12),
-        // 역할 색상 (AI 선생님 메시지)
-        tertiary = Color(0xFF5B8A72),
-        onTertiary = Color.White,
-        tertiaryContainer = Color(0xFFE5F0E9),
-        onTertiaryContainer = Color(0xFF1E3D2A)
+    MaterialTheme(
+        colorScheme = LightColors,
+        shapes = AppShapes,
+        typography = AppTypography,
+        content = content
     )
-    MaterialTheme(colorScheme = colors, content = content)
 }

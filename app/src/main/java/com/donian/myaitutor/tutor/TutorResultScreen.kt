@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -30,8 +28,6 @@ import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -65,6 +61,9 @@ import com.donian.myaitutor.ai.TutorGrade
 import com.donian.myaitutor.camera.ExifImageTransform
 import com.donian.myaitutor.ui.components.TeacherMessageBubble
 import com.donian.myaitutor.ui.components.TypingIndicator
+import com.donian.myaitutor.ui.components.UserMessageBubble
+import com.donian.myaitutor.ui.home.ChatMessage
+import com.donian.myaitutor.ui.home.ChatRole
 import com.donian.myaitutor.ui.home.FollowUpChips
 import com.donian.myaitutor.ui.text.AssistantAnswer
 import com.donian.myaitutor.ui.text.parseAnswerWithSuggestions
@@ -73,10 +72,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * 실시간 AI 선생님 화면. 학년 칩, 진행 상태 카드, 접기·펼치기 진행 내역,
- * 기존 AssistantAnswer(LaTeX/Markdown) 기반 실시간 해설을 표시합니다.
- *
- * 상태를 소유하지 않고 HomeViewModel에서 내려온 값만 그립니다.
+ * 실시간 AI 선생님 화면 - 개선된 디자인.
+ * AI 답변과 학생 질문을 개별 채팅 버블로 분리하여 표시.
+ * 학년 칩은 HomeScreen 상단으로 이동됨.
  */
 @Composable
 internal fun TutorResultScreen(
@@ -85,8 +83,7 @@ internal fun TutorResultScreen(
     selectedGrade: TutorGrade,
     onGradeSelected: (TutorGrade) -> Unit,
     ocrText: String,
-    /** 크롭/전처리가 끝난 OCR 입력 이미지. 미리보기 표시용이며 null이면 생략한다. */
-    preprocessedImage: File? = null,
+    preprocessedImage: File?,
     capturedImageAvailable: Boolean,
     modelReady: Boolean,
     isAnalyzing: Boolean,
@@ -100,6 +97,7 @@ internal fun TutorResultScreen(
     onSendChoice: (String) -> Unit,
     inputFocusRequester: FocusRequester,
     keyboardController: SoftwareKeyboardController?,
+    messages: List<ChatMessage>,
     modifier: Modifier = Modifier
 ) {
     var progressExpanded by remember { mutableStateOf(false) }
@@ -110,13 +108,12 @@ internal fun TutorResultScreen(
         if (tutorState.isGenerating) progressExpanded = false
     }
 
-    // 사용자가 하단을 보고 있을 때만 자동 스크롤을 유지합니다.
     LaunchedEffect(answerScrollState) {
         snapshotFlow { answerScrollState.value }.collect { value ->
             autoScroll = value >= answerScrollState.maxValue - 24
         }
     }
-    LaunchedEffect(answer, tutorState.currentStatus) {
+    LaunchedEffect(answer, tutorState.currentStatus, messages.size) {
         if (autoScroll) {
             withFrameNanos { }
             if (!answerScrollState.isScrollInProgress) {
@@ -126,11 +123,6 @@ internal fun TutorResultScreen(
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
-        GradeChips(
-            selectedGrade = selectedGrade,
-            onGradeSelected = onGradeSelected
-        )
-        Spacer(Modifier.height(8.dp))
         TutorStatusCard(
             tutorState = tutorState,
             canRetryAnalysis = canRetryAnalysis,
@@ -141,7 +133,7 @@ internal fun TutorResultScreen(
             onRecoverTutor = onRecoverTutor
         )
         if (tutorState.progressStage != TutorProgressStage.IDLE) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
         }
 
         val parsedAnswer = remember(answer) { parseAnswerWithSuggestions(answer) }
@@ -155,28 +147,64 @@ internal fun TutorResultScreen(
             if (ocrText.isNotBlank() || preprocessedImage != null) {
                 OcrTextDisclosure(text = ocrText, imageFile = preprocessedImage)
             }
-            when {
-                answer.isNotBlank() -> {
-                    TeacherMessageBubble {
-                        SelectionContainer {
-                            AssistantAnswer(
-                                text = answer,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+
+            // 메시지 목록 표시 (AI 답변 + 학생 질문 분리)
+            if (messages.isNotEmpty()) {
+                messages.forEach { message ->
+                    when (message.role) {
+                        ChatRole.TEACHER -> {
+                            TeacherMessageBubble {
+                                SelectionContainer {
+                                    AssistantAnswer(
+                                        text = message.text,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+                        }
+                        ChatRole.STUDENT -> {
+                            UserMessageBubble {
+                                Text(
+                                    text = message.text,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
                         }
                     }
                 }
-                isAnalyzing -> {
-                    TypingIndicator()
+            } else if (answer.isNotBlank()) {
+                // 스트리밍 중인 답변 (아직 messages로 이동 전)
+                TeacherMessageBubble {
+                    SelectionContainer {
+                        AssistantAnswer(
+                            text = answer,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
-                else -> {
-                    EmptyAnswerPlaceholder(
-                        capturedImageAvailable = capturedImageAvailable,
-                        modelReady = modelReady,
-                        onOpenSettings = onOpenSettings
-                    )
+            } else if (isAnalyzing) {
+                TypingIndicator()
+            } else {
+                EmptyAnswerPlaceholder(
+                    capturedImageAvailable = capturedImageAvailable,
+                    modelReady = modelReady,
+                    onOpenSettings = onOpenSettings
+                )
+            }
+
+            // 스트리밍 중일 때도 기존 answer 표시
+            if (messages.isEmpty() && answer.isNotBlank() && isAnalyzing) {
+                TeacherMessageBubble {
+                    SelectionContainer {
+                        AssistantAnswer(
+                            text = answer,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
+
             FollowUpChips(
                 suggestions = parsedAnswer.suggestions,
                 visible = showFollowUpChoices &&
@@ -190,42 +218,7 @@ internal fun TutorResultScreen(
                 keyboardController = keyboardController,
                 onSendChoice = onSendChoice
             )
-        }
-    }
-}
-
-@Composable
-private fun GradeChips(
-    selectedGrade: TutorGrade,
-    onGradeSelected: (TutorGrade) -> Unit
-) {
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        contentPadding = PaddingValues(horizontal = 2.dp)
-    ) {
-        items(TutorGrade.entries) { grade ->
-            val selected = grade == selectedGrade
-            FilterChip(
-                selected = selected,
-                onClick = { onGradeSelected(grade) },
-                label = {
-                    Text(
-                        grade.label,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-                    )
-                },
-                leadingIcon = if (selected) {
-                    {
-                        Icon(
-                            Icons.Default.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                } else null
-            )
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
@@ -290,28 +283,8 @@ private fun TutorStatusCard(
         }
 
         tutorState.isGenerating -> {
-            StatusCard(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                borderColor = MaterialTheme.colorScheme.outlineVariant
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = tutorState.currentStatus.ifBlank {
-                        "선생님이 문제를 꼼꼼히 살펴보고 있어요."
-                    },
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                if (!tutorState.isCancelling) {
-                    TextButton(onClick = onCancelGeneration) {
-                        Text(stringResource(R.string.tutor_btn_stop))
-                    }
-                }
-            }
+            // 로딩 상태: 원형 로딩 인디케이터는 HomeScreen 헤더 카드로 이동됨
+            Spacer(Modifier.height(0.dp))
         }
 
         tutorState.isCancelled -> {
@@ -536,7 +509,6 @@ private fun OcrTextDisclosure(text: String, imageFile: File?) {
     }
 }
 
-/** OCR에 전달되기 직전의 크롭·전처리 이미지를 접기 카드 안에서 보여줍니다. */
 @Composable
 private fun OcrInputImagePreview(imageFile: File) {
     val preview by produceState<ImageBitmap?>(initialValue = null, imageFile) {
@@ -562,10 +534,8 @@ private fun OcrInputImagePreview(imageFile: File) {
     }
 }
 
-/** 미리보기 최대 장변(px). 원본 해상도 그대로 올리지 않아 OOM을 막습니다. */
 private const val OCR_PREVIEW_MAX_SIDE_PX = 1280
 
-/** 반드시 IO 스레드에서 호출합니다. */
 private fun decodeOcrPreview(file: File): ImageBitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(file.absolutePath, bounds)

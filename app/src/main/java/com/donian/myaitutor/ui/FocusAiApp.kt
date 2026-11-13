@@ -186,7 +186,8 @@ fun FocusAiApp(host: HomeViewModelHost) {
             selectedGrade = uiState.selectedGrade,
             onGradeSelected = { viewModel.selectGrade(it) },
             tutorState = uiState.tutorState,
-            onRecoverTutor = { viewModel.recoverTutor() }
+            onRecoverTutor = { viewModel.recoverTutor() },
+            messages = uiState.messages
         )
     }
 }

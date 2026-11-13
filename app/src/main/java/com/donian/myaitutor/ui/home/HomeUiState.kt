@@ -60,5 +60,7 @@ data class HomeUiState(
     /** 시작 로딩 화면이 구독하는 엔진 워밍업 상태. */
     val warmup: ModelWarmupState = ModelWarmupState.IDLE,
     /** 크롭 및 이미지 전처리 완료 후 OCR에 전달되기 전의 이미지. */
-    val preprocessedImage: File? = null
+    val preprocessedImage: File? = null,
+    /** 채팅 메시지 목록 (AI 답변 + 학생 질문 분리 표시용). */
+    val messages: List<ChatMessage> = emptyList()
 )

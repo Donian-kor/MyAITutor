@@ -87,8 +87,9 @@ fun TeacherAvatar(
 }
 
 /**
- * AI 선생님 메시지 버블.
- * 선생님의 답변을 채팅 메시지처럼 표시합니다.
+ * AI 선생님 메시지 버블 - 개선된 디자인.
+ * 답변 내용이 잘리지 않도록 충분한 여백 제공.
+ * 배경색으로 AI 답변과 사용자 질문을 구분.
  */
 @Composable
 fun TeacherMessageBubble(
@@ -101,19 +102,19 @@ fun TeacherMessageBubble(
         verticalAlignment = Alignment.Top
     ) {
         TeacherAvatar(size = 32)
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(10.dp))
         Surface(
             shape = RoundedCornerShape(
-                topStart = 4.dp,
-                topEnd = 16.dp,
-                bottomStart = 16.dp,
-                bottomEnd = 16.dp
+                topStart = 6.dp,
+                topEnd = 18.dp,
+                bottomStart = 18.dp,
+                bottomEnd = 18.dp
             ),
-            color = MaterialTheme.colorScheme.surface,
+            color = MaterialTheme.colorScheme.secondaryContainer,
             shadowElevation = 1.dp,
             modifier = Modifier.weight(1f, fill = false)
         ) {
-            Box(modifier = Modifier.padding(12.dp)) {
+            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 content()
             }
         }
@@ -121,8 +122,8 @@ fun TeacherMessageBubble(
 }
 
 /**
- * 사용자 메시지 버블.
- * 사용자의 질문을 채팅 메시지처럼 표시합니다.
+ * 사용자 메시지 버블 - 개선된 디자인.
+ * AI 답변과 배경색으로 명확히 구분.
  */
 @Composable
 fun UserMessageBubble(
@@ -136,15 +137,16 @@ fun UserMessageBubble(
     ) {
         Surface(
             shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 4.dp,
-                bottomStart = 16.dp,
-                bottomEnd = 16.dp
+                topStart = 18.dp,
+                topEnd = 6.dp,
+                bottomStart = 18.dp,
+                bottomEnd = 18.dp
             ),
             color = MaterialTheme.colorScheme.primaryContainer,
+            shadowElevation = 1.dp,
             modifier = Modifier.weight(1f, fill = false)
         ) {
-            Box(modifier = Modifier.padding(12.dp)) {
+            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 content()
             }
         }

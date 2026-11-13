@@ -189,6 +189,7 @@ class HomeViewModel(
             showFollowUpChoices = false,
             statusMessage = null,
             isAnalyzing = false,
+            messages = emptyList(),
             tutorState = TutorUiState()
         )
     }
@@ -218,6 +219,7 @@ class HomeViewModel(
             ocrBlocks = emptyList(),
             answer = "",
             showFollowUpChoices = false,
+            messages = emptyList(),
             tutorState = TutorUiState()
         )
     }
@@ -413,15 +415,17 @@ class HomeViewModel(
         val currentGeneration = ++generationId
         userCancelledGeneration = null
         tutorParser.reset()
-        val previousAnswer = _state.value.answer
-        val pendingAnswer = followUpAnswerPrefix(previousAnswer, question)
+        // 학생 질문을 개별 메시지로 추가
+        val studentMessage = ChatMessage(role = ChatRole.STUDENT, text = question)
+        val currentMessages = _state.value.messages + studentMessage
         _state.value = _state.value.copy(
             isAnalyzing = true,
-            answer = pendingAnswer,
+            answer = "",
             showFollowUpChoices = false,
             inputText = "",
             statusMessage = null,
             analysisStage = null,
+            messages = currentMessages,
             tutorState = tutorParser.startFollowUp()
         )
         generationJob = scope.launch {
@@ -534,11 +538,19 @@ class HomeViewModel(
             tutorState.isGenerating -> tutorParser.onStreamEnded().state
             else -> tutorState
         }
+        // AI 답변이 있으면 messages에 추가하여 학생 질문과 분리 표시
+        val answerText = _state.value.answer
+        val updatedMessages = if (answerText.isNotBlank()) {
+            _state.value.messages + ChatMessage(role = ChatRole.TEACHER, text = answerText)
+        } else {
+            _state.value.messages
+        }
         _state.value = _state.value.copy(
             isAnalyzing = false,
             analysisStage = null,
             showFollowUpChoices = completed && receivedAnswer && showChoicesAfterResponse,
             tokenCount = tokens,
+            messages = updatedMessages,
             tutorState = tutorState
         )
         generationJob = null
