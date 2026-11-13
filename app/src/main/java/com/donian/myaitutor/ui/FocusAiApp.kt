@@ -194,6 +194,8 @@ fun FocusAiApp(host: HomeViewModelHost) {
             onCancelGeneration = { viewModel.cancelGeneration() },
             selectedGrade = uiState.selectedGrade,
             onGradeSelected = { viewModel.selectGrade(it) },
+            chatMode = uiState.chatMode,
+            onChatModeChange = { viewModel.setChatMode(it) },
             tutorState = uiState.tutorState,
             onRecoverTutor = { viewModel.recoverTutor() },
             messages = uiState.messages

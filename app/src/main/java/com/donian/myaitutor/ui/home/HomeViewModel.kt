@@ -15,6 +15,7 @@ import com.donian.myaitutor.ocr.OcrBlock
 import com.donian.myaitutor.ocr.OcrTextRecognizer
 import com.donian.myaitutor.tutor.LlmInferenceEngine
 import com.donian.myaitutor.tutor.RealGemmaTutorEngine
+import com.donian.myaitutor.tutor.TutorMode
 import com.donian.myaitutor.tutor.TutorParseResult
 import com.donian.myaitutor.tutor.TutorRequest
 import com.donian.myaitutor.tutor.TutorStreamChunk
@@ -166,6 +167,44 @@ class HomeViewModel(
     /** 학년 변경은 기존 HomeViewModel 메서드로 처리하고 HomeUiState에 단일 저장합니다. */
     fun selectGrade(grade: TutorGrade) {
         _state.value = _state.value.copy(selectedGrade = grade)
+    }
+
+    /**
+     * 학습 모드와 자유 대화 모드를 전환합니다.
+     * 시스템 지시문은 Conversation 생성 시 고정되므로 대화를 새로 만들어 교체합니다.
+     */
+    fun setChatMode(chatMode: Boolean) {
+        if (_state.value.chatMode == chatMode) return
+        if (_state.value.isAnalyzing) {
+            tutorEngine.cancelGeneration()
+        }
+        generationJob?.cancel()
+        generationJob = null
+        generationId++
+        userCancelledGeneration = null
+        lastSubject = ""
+        queuedQuestion = null
+        tutorParser.reset()
+        _state.value = _state.value.copy(
+            chatMode = chatMode,
+            capturedImage = null,
+            cameraCapturedImage = null,
+            preprocessedImage = null,
+            answer = "",
+            inputText = "",
+            analysisStage = null,
+            ocrText = "",
+            ocrBlocks = emptyList(),
+            showFollowUpChoices = false,
+            statusMessage = null,
+            isAnalyzing = false,
+            messages = emptyList(),
+            tutorState = TutorUiState()
+        )
+        val mode = if (chatMode) TutorMode.FREE_CHAT else TutorMode.LEARNING
+        scope.launch {
+            runCatching { tutorEngine.resetConversation(mode.systemInstruction) }
+        }
     }
 
     fun resetForNewSubject() {
@@ -427,7 +466,8 @@ class HomeViewModel(
             return
         }
 
-        val isStandaloneQuestion = lastSubject != subject
+        // 자유 대화 모드는 과목 구분이 없으므로 항상 같은 대화를 이어갑니다.
+        val isStandaloneQuestion = !_state.value.chatMode && lastSubject != subject
         lastSubject = subject
         val currentGeneration = ++generationId
         userCancelledGeneration = null
@@ -455,7 +495,8 @@ class HomeViewModel(
                     subject = subject,
                     grade = grade,
                     options = inferenceOptionsFor(grade, isFollowUp = true),
-                    isStandaloneQuestion = isStandaloneQuestion
+                    isStandaloneQuestion = isStandaloneQuestion,
+                    mode = if (_state.value.chatMode) TutorMode.FREE_CHAT else TutorMode.LEARNING
                 )
                 _state.value = _state.value.copy(tutorState = tutorParser.onAnalysisStarted())
                 receivedAnswer = collectTutorStream(request, currentGeneration)

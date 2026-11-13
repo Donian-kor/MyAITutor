@@ -32,7 +32,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -104,6 +106,8 @@ internal fun HomeScreen(
     onCancelGeneration: () -> Unit,
     selectedGrade: TutorGrade,
     onGradeSelected: (TutorGrade) -> Unit,
+    chatMode: Boolean,
+    onChatModeChange: (Boolean) -> Unit,
     tutorState: TutorUiState,
     onRecoverTutor: () -> Unit,
     messages: List<ChatMessage>
@@ -138,6 +142,8 @@ internal fun HomeScreen(
                         inputText = inputText,
                         answer = answer,
                         isAnalyzing = isAnalyzing,
+                        // 자유 대화 모드에서는 문제를 촬영하지 않습니다.
+                        captureEnabled = !chatMode,
                         inputFocusRequester = inputFocusRequester,
                         onInputChange = onInputChange,
                         onOpenCamera = onOpenCamera,
@@ -183,14 +189,14 @@ internal fun HomeScreen(
                         // 문제 풀이 제목 + 토큰 수
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                when (analysisStage) {
-                                    ImageAnalysisStage.OCR -> stringResource(R.string.home_stage_ocr)
-                                    ImageAnalysisStage.GEMMA -> stringResource(R.string.home_stage_gemma)
-                                    null -> if (isAnalyzing) {
+                                when {
+                                    chatMode -> stringResource(R.string.home_chat_mode_label)
+                                    analysisStage == ImageAnalysisStage.OCR ->
+                                        stringResource(R.string.home_stage_ocr)
+                                    analysisStage == ImageAnalysisStage.GEMMA ->
                                         stringResource(R.string.home_stage_gemma)
-                                    } else {
-                                        stringResource(R.string.home_title_generator)
-                                    }
+                                    isAnalyzing -> stringResource(R.string.home_stage_gemma)
+                                    else -> stringResource(R.string.home_title_generator)
                                 },
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.titleMedium,
@@ -256,6 +262,39 @@ internal fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        // 자유 대화 모드 스위치
+                        FilterChip(
+                            selected = chatMode,
+                            onClick = { onChatModeChange(!chatMode) },
+                            label = {
+                                Text(
+                                    stringResource(R.string.home_chat_mode_label),
+                                    fontWeight = if (chatMode) FontWeight.Bold else FontWeight.Normal,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    if (chatMode) {
+                                        Icons.Default.Forum
+                                    } else {
+                                        Icons.Default.School
+                                    },
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            shape = shapes.large,
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = colors.tertiary,
+                                selectedLabelColor = colors.onTertiary,
+                                selectedLeadingIconColor = colors.onTertiary,
+                                containerColor = colors.surfaceVariant,
+                                labelColor = colors.onSurfaceVariant
+                            )
+                        )
+
                         // 학년 칩 (좌측, 스크롤 가능)
                         LazyRow(
                             modifier = Modifier.weight(1f),
@@ -290,7 +329,8 @@ internal fun HomeScreen(
                             }
                         }
 
-                        // 과목 선택 드롭다운 (우측)
+                        // 과목 선택 드롭다운 (우측) - 자유 대화 모드에서는 과목이 무의미해 숨깁니다.
+                        if (!chatMode) {
                         Box {
                             Surface(
                                 shape = shapes.medium,
@@ -343,6 +383,7 @@ internal fun HomeScreen(
                                 }
                             }
                         }
+                        }
                     }
                 }
             }
@@ -390,6 +431,7 @@ internal fun HomeScreen(
                             keyboardController = keyboardController,
                             messages = messages,
                             selectedSubject = selectedSubject,
+                            chatMode = chatMode,
                             onOpenCamera = onOpenCamera,
                             modifier = Modifier.weight(1f)
                         )

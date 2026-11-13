@@ -1,6 +1,7 @@
 package com.donian.myaitutor.ui.home
 
 import com.donian.myaitutor.ai.DEFAULT_MAX_OUTPUT_TOKENS
+import com.donian.myaitutor.ai.MAX_CONTEXT_TOKENS
 import com.donian.myaitutor.ai.TutorGrade
 import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.ocr.OcrBlock
@@ -51,7 +52,8 @@ data class HomeUiState(
     val backendLabel: String = "아직 모델이 실행되지 않았습니다.",
     val showFollowUpChoices: Boolean = false,
     val tokenCount: Int = 0,
-    val maxContextTokens: Int = 2_048,
+    /** 모델의 전체 컨텍스트 상한. 표시용 단일 원본입니다. */
+    val maxContextTokens: Int = MAX_CONTEXT_TOKENS,
     val maxOutputTokens: Int = DEFAULT_MAX_OUTPUT_TOKENS,
     /** 학년의 단일 원본. 별도 ViewModel/저장소를 만들지 않습니다. */
     val selectedGrade: TutorGrade = TutorGrade.ELEMENTARY,
@@ -62,5 +64,7 @@ data class HomeUiState(
     /** 크롭 및 이미지 전처리 완료 후 OCR에 전달되기 전의 이미지. */
     val preprocessedImage: File? = null,
     /** 채팅 메시지 목록 (AI 답변 + 학생 질문 분리 표시용). */
-    val messages: List<ChatMessage> = emptyList()
+    val messages: List<ChatMessage> = emptyList(),
+    /** true이면 과목과 무관한 자유 대화 모드입니다. */
+    val chatMode: Boolean = false
 )

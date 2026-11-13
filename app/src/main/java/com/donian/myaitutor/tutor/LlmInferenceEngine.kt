@@ -6,15 +6,37 @@ import com.donian.myaitutor.ai.AssistantStreamEvent
 import com.donian.myaitutor.ai.AssistantStreamOptions
 import com.donian.myaitutor.ai.DEFAULT_MAX_OUTPUT_TOKENS
 import com.donian.myaitutor.ai.DEFAULT_THINKING_TOKEN_BUDGET
+import com.donian.myaitutor.ai.ChatSystemInstruction
+import com.donian.myaitutor.ai.SystemInstruction
 import com.donian.myaitutor.ai.TutorGrade
 import com.donian.myaitutor.ai.analyzeImagePrompt
 import com.donian.myaitutor.ai.followUpPrompt
+import com.donian.myaitutor.ai.freeChatPrompt
 import com.donian.myaitutor.ai.standaloneQuestionPrompt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+
+/**
+ * 앱의 두 가지 사용 모드.
+ * 전환 시 Conversation을 새로 만들어 시스템 지시문을 교체합니다.
+ */
+enum class TutorMode {
+    /** 사진·OCR 기반 과목 학습과 학습 질문. */
+    LEARNING,
+
+    /** 과목과 무관한 자유 대화(고민·일상·잡담). */
+    FREE_CHAT;
+
+    /** 이 모드에서 사용할 시스템 지시문. */
+    val systemInstruction: String
+        get() = when (this) {
+            LEARNING -> SystemInstruction
+            FREE_CHAT -> ChatSystemInstruction
+        }
+}
 
 /**
  * 요청별 추론 설정. Conversation이나 Engine을 다시 만들지 않고 그대로 전달합니다.
@@ -36,7 +58,8 @@ data class TutorRequest(
     val subject: String,
     val grade: TutorGrade,
     val options: InferenceOptions,
-    val isStandaloneQuestion: Boolean = false
+    val isStandaloneQuestion: Boolean = false,
+    val mode: TutorMode = TutorMode.LEARNING
 )
 
 /** 학년별 Thinking/출력 토큰 설정을 한 곳에서 만듭니다. */
@@ -58,7 +81,8 @@ interface LlmInferenceEngine {
     fun cancelGeneration()
     suspend fun awaitGenerationStopped(timeoutMillis: Long): Boolean
 
-    suspend fun resetConversation()
+    /** 엔진은 유지하고 Conversation을 교체합니다. 모드 전환 시 지시문을 함께 바꿉니다. */
+    suspend fun resetConversation(systemInstruction: String = SystemInstruction)
     suspend fun backendLabel(): String
     suspend fun getTokenCount(): Int
     suspend fun preWarm()
@@ -75,6 +99,8 @@ class RealGemmaTutorEngine(
 
     override fun stream(request: TutorRequest): Flow<TutorStreamChunk> = flow {
         val textParts = when {
+            request.mode == TutorMode.FREE_CHAT ->
+                listOf(freeChatPrompt(request.text, request.grade))
             request.options.isFollowUp && !request.isStandaloneQuestion ->
                 listOf(followUpPrompt(request.text, request.subject, request.grade))
             request.isStandaloneQuestion ->
@@ -86,7 +112,9 @@ class RealGemmaTutorEngine(
         }
         val assistantRequest = AssistantRequest(
             textParts = textParts,
-            startsNewProblem = request.isStandaloneQuestion || !request.options.isFollowUp,
+            // 자유 대화는 매 턴 같은 대화를 이어가므로 새 문제를 시작하지 않습니다.
+            startsNewProblem = request.mode == TutorMode.LEARNING &&
+                (request.isStandaloneQuestion || !request.options.isFollowUp),
             options = AssistantStreamOptions(
                 maxOutputTokens = request.options.maxOutputTokens,
                 thinkingEnabled = request.options.thinkingEnabled,
@@ -124,7 +152,8 @@ class RealGemmaTutorEngine(
     override suspend fun awaitGenerationStopped(timeoutMillis: Long): Boolean =
         assistant.awaitGenerationStopped(timeoutMillis)
 
-    override suspend fun resetConversation() = assistant.resetConversation()
+    override suspend fun resetConversation(systemInstruction: String) =
+        assistant.resetConversation(systemInstruction)
     override suspend fun backendLabel(): String = assistant.backendLabel()
     override suspend fun getTokenCount(): Int = assistant.getTokenCount()
     override suspend fun preWarm() = assistant.preWarm()
@@ -153,6 +182,10 @@ class FakeGemmaTutorEngine(
     var resetConversationCalls = 0
     var preWarmCalls = 0
     var releaseCalls = 0
+
+    /** 마지막 [resetConversation]에 전달된 시스템 지시문. 모드 전환 검증에 사용합니다. */
+    var lastSystemInstruction: String? = null
+        private set
 
     /** 테스트에서 스트림을 원하는 시점까지 붙잡아 둘 때 사용합니다. */
     var gate: CompletableDeferred<Unit>? = null
@@ -187,8 +220,9 @@ class FakeGemmaTutorEngine(
         return awaitStoppedResult
     }
 
-    override suspend fun resetConversation() {
+    override suspend fun resetConversation(systemInstruction: String) {
         resetConversationCalls++
+        lastSystemInstruction = systemInstruction
     }
 
     override suspend fun backendLabel(): String = backend

@@ -119,6 +119,11 @@
 
     <!-- 실시간 AI 선생님 -->
     <string name="btn_take_photo">사진 촬영</string>
+    <!-- 자유 대화 모드 -->
+    <string name="home_chat_mode_label">자유 대화</string>
+    <string name="chat_assistant_label">나만의 AI 친구</string>
+    <string name="home_chat_mode_on">자유 대화 켜짐 · 과목과 무관하게 이야기합니다</string>
+    <string name="home_chat_mode_off">과목 학습 · 촬영한 문제를 풀이합니다</string>
     <string name="tutor_btn_stop">중단</string>
     <string name="tutor_btn_recover">새 대화로 복구</string>
     <string name="tutor_completed_status">✓ 풀이 완성 (눌러서 풀이 진행 내역 보기)</string>

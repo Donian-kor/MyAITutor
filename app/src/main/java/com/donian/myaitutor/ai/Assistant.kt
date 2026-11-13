@@ -46,8 +46,13 @@ interface Assistant {
     /** 취소 후 네이티브 추론이 실제로 끝날 때까지 기다립니다. */
     suspend fun awaitGenerationStopped(timeoutMillis: Long): Boolean
 
-    /** 엔진은 유지하고 활성 Conversation만 안전하게 교체합니다. */
-    suspend fun resetConversation()
+    /**
+     * 엔진은 유지하고 활성 Conversation만 안전하게 교체합니다.
+     *
+     * [systemInstruction]은 새 Conversation의 시스템 지시문으로 사용합니다.
+     * 기본값은 학습 모드 지시문이며, 모드 전환 시에만 다른 값을 전달합니다.
+     */
+    suspend fun resetConversation(systemInstruction: String = SystemInstruction)
 
     // 기존 호출부 호환 API. 스트리밍 API로도 동일한 요청을 수행할 수 있습니다.
     suspend fun analyzeImage(ocrText: String, subject: String, onTextChanged: suspend (String) -> Unit)

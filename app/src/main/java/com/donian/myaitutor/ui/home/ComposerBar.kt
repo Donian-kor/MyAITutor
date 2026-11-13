@@ -50,6 +50,7 @@ internal fun ComposerBar(
     inputText: String,
     answer: String,
     isAnalyzing: Boolean,
+    captureEnabled: Boolean,
     inputFocusRequester: FocusRequester,
     onInputChange: (String) -> Unit,
     onOpenCamera: () -> Unit,
@@ -63,7 +64,7 @@ internal fun ComposerBar(
     ) {
         OutlinedButton(
             onClick = onOpenCamera,
-            enabled = !isAnalyzing,
+            enabled = !isAnalyzing && captureEnabled,
             modifier = if (compact) Modifier.size(48.dp) else Modifier.height(48.dp),
             shape = RoundedCornerShape(24.dp),
             contentPadding = if (compact) PaddingValues(0.dp) else PaddingValues(horizontal = 12.dp),

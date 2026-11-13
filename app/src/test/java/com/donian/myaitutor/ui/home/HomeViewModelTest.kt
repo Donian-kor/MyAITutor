@@ -5,7 +5,15 @@ import android.content.Context
 import com.donian.myaitutor.ai.Assistant
 import com.donian.myaitutor.ai.AssistantRequest
 import com.donian.myaitutor.ai.AssistantStreamEvent
+import com.donian.myaitutor.ai.ChatSystemInstruction
+import com.donian.myaitutor.ai.DEFAULT_MAX_OUTPUT_TOKENS
+import com.donian.myaitutor.ai.DEFAULT_THINKING_TOKEN_BUDGET
+import com.donian.myaitutor.ai.MAX_CONTEXT_TOKENS
+import com.donian.myaitutor.ai.MAX_CONVERSATION_TOKENS
+import com.donian.myaitutor.ai.SYSTEM_PROMPT_TOKEN_RESERVE
+import com.donian.myaitutor.ai.SystemInstruction
 import com.donian.myaitutor.ai.TutorGrade
+import com.donian.myaitutor.ai.gradeChatTone
 import com.donian.myaitutor.model.ModelDownloadRepository
 import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelDownloadStatus
@@ -13,6 +21,7 @@ import com.donian.myaitutor.ocr.OcrBlock
 import com.donian.myaitutor.ocr.OcrTextRecognizer
 import com.donian.myaitutor.tutor.FakeGemmaTutorEngine
 import com.donian.myaitutor.tutor.RealGemmaTutorEngine
+import com.donian.myaitutor.tutor.TutorMode
 import com.donian.myaitutor.tutor.TutorRequest
 import com.donian.myaitutor.tutor.TutorStreamChunk
 import com.donian.myaitutor.tutor.inferenceOptionsFor
@@ -61,6 +70,10 @@ class HomeViewModelTest {
         var awaitStoppedCalls = 0
         var lastRequest: AssistantRequest? = null
 
+        /** 마지막 [resetConversation]에 전달된 시스템 지시문. 모드 전환 검증에 사용합니다. */
+        var lastSystemInstruction: String? = null
+            private set
+
         override fun streamAnswer(request: AssistantRequest): Flow<AssistantStreamEvent> {
             streamCalls++
             lastRequest = request
@@ -72,8 +85,9 @@ class HomeViewModelTest {
             return true
         }
 
-        override suspend fun resetConversation() {
+        override suspend fun resetConversation(systemInstruction: String) {
             resetCalls++
+            lastSystemInstruction = systemInstruction
         }
 
         override suspend fun analyzeImage(
@@ -241,7 +255,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
         val highOptions = engine.requests.last().options
         assertTrue(highOptions.thinkingEnabled)
-        assertEquals(1024, highOptions.thinkingTokenBudget)
+        assertEquals(DEFAULT_THINKING_TOKEN_BUDGET, highOptions.thinkingTokenBudget)
 
         file.delete()
     }
@@ -535,6 +549,157 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `자유 대화 모드로 전환하면 대화 지시문으로 Conversation을 교체한다`() = runTest {
+        val engine = FakeGemmaTutorEngine()
+        val (vm, _) = createViewModel(this, engine = engine)
+
+        vm.setChatMode(true)
+        advanceUntilIdle()
+
+        assertEquals(1, engine.resetConversationCalls)
+        assertEquals(ChatSystemInstruction, engine.lastSystemInstruction)
+        assertTrue(vm.state.value.chatMode)
+    }
+
+    @Test
+    fun `학습 모드로 돌아오면 학습 지시문으로 Conversation을 교체한다`() = runTest {
+        val engine = FakeGemmaTutorEngine()
+        val (vm, _) = createViewModel(this, engine = engine)
+
+        vm.setChatMode(true)
+        advanceUntilIdle()
+        vm.setChatMode(false)
+        advanceUntilIdle()
+
+        assertEquals(2, engine.resetConversationCalls)
+        assertEquals(SystemInstruction, engine.lastSystemInstruction)
+        assertFalse(vm.state.value.chatMode)
+    }
+
+    @Test
+    fun `모드 전환은 진행 중인 대화와 촬영 이미지를 초기화한다`() = runTest {
+        val engine = FakeGemmaTutorEngine()
+        val (vm, _) = createViewModel(this, engine = engine)
+        val file = File.createTempFile("img", ".jpg")
+
+        vm.analyzeImage(file, "수학")
+        advanceUntilIdle()
+        assertTrue(vm.state.value.messages.isNotEmpty())
+
+        vm.setChatMode(true)
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value.messages.isEmpty())
+        assertNull(vm.state.value.capturedImage)
+        assertEquals("", vm.state.value.answer)
+        file.delete()
+    }
+
+    @Test
+    fun `자유 대화 질문은 새 문제를 시작하지 않고 대화 맥락을 이어간다`() = runTest {
+        val assistant = FakeAssistant()
+        val engine = RealGemmaTutorEngine(assistant)
+        val request = TutorRequest(
+            text = "오늘 친구랑 크게 싸웠어",
+            subject = "기타",
+            grade = TutorGrade.MIDDLE,
+            options = inferenceOptionsFor(TutorGrade.MIDDLE, isFollowUp = true),
+            mode = TutorMode.FREE_CHAT
+        )
+
+        engine.stream(request).toList()
+
+        val assistantRequest = requireNotNull(assistant.lastRequest)
+        assertFalse(assistantRequest.startsNewProblem)
+        val prompt = assistantRequest.textParts.single()
+        assertTrue(prompt.contains("오늘 친구랑 크게 싸웠어"))
+        assertTrue(prompt.contains("중학생과 이야기하고 있어"))
+        assertFalse(prompt.contains("선택 과목"))
+    }
+
+    @Test
+    fun `자유 대화 모드의 질문은 과목 이동과 무관하게 대화를 이어간다`() = runTest {
+        val engine = FakeGemmaTutorEngine()
+        val (vm, _) = createViewModel(this, engine = engine)
+        val file = File.createTempFile("img", ".jpg")
+
+        vm.analyzeImage(file, "수학")
+        advanceUntilIdle()
+        vm.setChatMode(true)
+        advanceUntilIdle()
+
+        vm.sendQuestion("오늘 기분이 안 좋아")
+        advanceUntilIdle()
+        vm.sendQuestion("그냥 아무한테도 말 못 하겠어")
+        advanceUntilIdle()
+
+        val last = engine.requests.last()
+        assertEquals(TutorMode.FREE_CHAT, last.mode)
+        assertFalse(last.isStandaloneQuestion)
+        // 모드를 한 번만 바꿨으므로 추가 재설정은 없습니다.
+        assertEquals(1, engine.resetConversationCalls)
+        file.delete()
+    }
+
+    @Test
+    fun `안전 규칙은 모드별로 분리되어 각 지시문에 포함된다`() = runTest {
+        // 공통 필수 항목은 두 모드 모두에 들어 있습니다.
+        listOf(SystemInstruction, ChatSystemInstruction).forEach { prompt ->
+            assertTrue(prompt.contains("안전 규칙"))
+            assertTrue(prompt.contains("욕설"))
+            assertTrue(prompt.contains("인신공격"))
+            assertTrue(prompt.contains("청소년상담전화 1388"))
+            assertTrue(prompt.contains("무효화되지 않습니다"))
+        }
+
+        // 학습 모드 전용: 문제 풀이 맥락에 맞는 항목만.
+        assertTrue(SystemInstruction.contains("학대·괴롭힘 신호가 보이면"))
+        assertFalse(SystemInstruction.contains("당신은 AI이며 실제 사람이 아닙니다"))
+        assertFalse(SystemInstruction.contains("랜덤채팅"))
+
+        // 자유 대화 모드 전용: 대화 맥락의 위험까지 포함.
+        assertTrue(ChatSystemInstruction.contains("당신은 AI이며 실제 사람이 아닙니다"))
+        assertTrue(ChatSystemInstruction.contains("만남을 제안받으면 정중히 거절"))
+        assertTrue(ChatSystemInstruction.contains("비밀 유지 약속"))
+        assertTrue(ChatSystemInstruction.contains("따돌림·복수·보복"))
+        assertTrue(ChatSystemInstruction.contains(" 랜덤채팅"))
+        assertTrue(ChatSystemInstruction.contains("자해·자살의 방법·수단·도구"))
+
+        // 자유 대화 지시문에는 학습 모드의 추천 질문 형식 규칙이 없어야 합니다.
+        assertFalse(ChatSystemInstruction.contains("맞춤 추천 질문"))
+        // 자유 대화는 친근한 반말체이며 존댓말 유지를 지시하지 않습니다.
+        assertTrue(ChatSystemInstruction.contains("친근한 반말로 말하세요"))
+        assertFalse(ChatSystemInstruction.contains("존댓말을 유지"))
+        // 학년별 말투는 모두 반말 기준입니다.
+        assertTrue(gradeChatTone(TutorGrade.ELEMENTARY).contains("반말"))
+        assertTrue(gradeChatTone(TutorGrade.MIDDLE).contains("반말"))
+        assertTrue(gradeChatTone(TutorGrade.HIGH).contains("반말"))
+    }
+
+    @Test
+    fun `컨텍스트 예산은 모델 한계 4096을 넘지 않는다`() = runTest {
+        assertEquals(4_096, MAX_CONTEXT_TOKENS)
+        // 시스템 지시문 여유 + 출력 상한이 전체 컨텍스트 안에 들어와야 합니다.
+        assertTrue(SYSTEM_PROMPT_TOKEN_RESERVE + DEFAULT_MAX_OUTPUT_TOKENS < MAX_CONTEXT_TOKENS)
+        // 대화 리셋 임계값은 계산식과 일치하고 0보다 커야 합니다.
+        assertEquals(
+            MAX_CONTEXT_TOKENS - SYSTEM_PROMPT_TOKEN_RESERVE - DEFAULT_MAX_OUTPUT_TOKENS,
+            MAX_CONVERSATION_TOKENS
+        )
+        assertTrue(MAX_CONVERSATION_TOKENS > 0)
+        // Thinking 예산은 출력 상한 안에 포함되므로 출력 상한보다 작아야 합니다.
+        assertTrue(DEFAULT_THINKING_TOKEN_BUDGET < DEFAULT_MAX_OUTPUT_TOKENS)
+    }
+
+    @Test
+    fun `압축된 안전 규칙은 이전보다 짧다`() = runTest {
+        // 자유 대화 시스템 지시문이 4,400자 이하로 유지되는지 확인합니다.
+        assertTrue(ChatSystemInstruction.length < 4_400)
+        // 학습 모드 지시문은 자유 대화보다 짧아야 합니다.
+        assertTrue(SystemInstruction.length < ChatSystemInstruction.length)
+    }
+
+    @Test
     fun `RealGemmaTutorEngine은 OCR 텍스트와 학년 지침을 프롬프트로 구성한다`() = runTest {
         val assistant = FakeAssistant()
         val engine = RealGemmaTutorEngine(assistant)
@@ -554,7 +719,7 @@ class HomeViewModelTest {
         assertTrue(assistantRequest.textParts[1].contains("수학"))
         assertTrue(assistantRequest.textParts[1].contains("중학생"))
         assertTrue(assistantRequest.options.thinkingEnabled)
-        assertEquals(1024, assistantRequest.options.thinkingTokenBudget)
+        assertEquals(DEFAULT_THINKING_TOKEN_BUDGET, assistantRequest.options.thinkingTokenBudget)
     }
 
     @Test

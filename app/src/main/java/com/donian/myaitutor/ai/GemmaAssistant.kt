@@ -39,9 +39,6 @@ class GemmaAssistant(context: Context) : Assistant {
     companion object {
         private const val TAG = "GemmaAssistant"
 
-        /** 대화가 이 토큰 수를 넘으면 문맥을 초기화합니다. (N-12) */
-        private const val MAX_CONVERSATION_TOKENS = 8_000
-
         /** Google AI Edge Gallery와 동일한 Thought 채널 이름. */
         private const val THOUGHT_CHANNEL = "thought"
 
@@ -257,17 +254,25 @@ class GemmaAssistant(context: Context) : Assistant {
     }
 
     /**
-     * 새 문제를 풀기 전에 이전 대화 문맥을 초기화합니다.
+     * 새 문제를 풀거나 모드를 바꾸기 전에 이전 대화 문맥을 초기화합니다.
      * 엔진은 유지하고 대화만 새로 생성합니다. (R-02)
+     *
+     * [systemInstruction]으로 모드에 맞는 시스템 지시문을 주입합니다.
      */
-    override suspend fun resetConversation() = withContext(runtimeDispatcher) {
-        generationMutex.withLock {
-            resetConversationLocked()
+    override suspend fun resetConversation(systemInstruction: String) =
+        withContext(runtimeDispatcher) {
+            generationMutex.withLock {
+                currentSystemInstruction = systemInstruction
+                resetConversationLocked()
+            }
         }
-    }
+
+    /** 현재 Conversation에 적용된 시스템 지시문. 모드 전환 시 교체합니다. */
+    @Volatile
+    private var currentSystemInstruction: String = SystemInstruction
 
     /** generationMutex를 이미 잡은 상태에서 Conversation만 교체합니다. */
-    private suspend fun resetConversationLocked() {
+    private fun resetConversationLocked() {
         runCatching { conversation?.cancelProcess() }
         runCatching { conversation?.close() }
         conversation = null
@@ -282,14 +287,17 @@ class GemmaAssistant(context: Context) : Assistant {
         val current = conversation ?: return
         val tokens = runCatching { current.getTokenCount() }.getOrElse { return }
         if (tokens < MAX_CONVERSATION_TOKENS) return
-        Log.i(TAG, "대화 토큰 수($tokens)가 상한($MAX_CONVERSATION_TOKENS)을 넘어 문맥을 초기화합니다.")
+        Log.i(
+            TAG,
+            "대화 토큰 수($tokens)가 상한($MAX_CONVERSATION_TOKENS)을 넘어 문맥을 초기화합니다."
+        )
         resetConversationLocked()
     }
 
     private fun createConversation(currentEngine: Engine): Conversation =
         currentEngine.createConversation(
             ConversationConfig(
-                systemInstruction = Contents.of(SystemInstruction),
+                systemInstruction = Contents.of(currentSystemInstruction),
                 samplerConfig = SamplerConfig(
                     topK = 20,
                     topP = 0.9,

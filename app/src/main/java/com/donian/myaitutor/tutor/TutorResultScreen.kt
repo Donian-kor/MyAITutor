@@ -102,6 +102,7 @@ internal fun TutorResultScreen(
     keyboardController: SoftwareKeyboardController?,
     messages: List<ChatMessage>,
     selectedSubject: String = "",
+    chatMode: Boolean = false,
     onOpenCamera: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -135,7 +136,8 @@ internal fun TutorResultScreen(
             onToggleProgress = { progressExpanded = !progressExpanded },
             onCancelGeneration = onCancelGeneration,
             onRetryAnalysis = onRetryAnalysis,
-            onRecoverTutor = onRecoverTutor
+            onRecoverTutor = onRecoverTutor,
+            chatMode = chatMode
         )
         if (tutorState.progressStage != TutorProgressStage.IDLE) {
             Spacer(Modifier.height(4.dp))
@@ -158,7 +160,10 @@ internal fun TutorResultScreen(
                 messages.forEach { message ->
                     when (message.role) {
                         ChatRole.TEACHER -> {
-                            TeacherMessageBubble(subject = selectedSubject) {
+                            TeacherMessageBubble(
+                                subject = selectedSubject,
+                                chatMode = chatMode
+                            ) {
                                 SelectionContainer {
                                     AssistantAnswer(
                                         text = message.text,
@@ -180,7 +185,10 @@ internal fun TutorResultScreen(
                 }
                 if (isAnalyzing) {
                     if (answer.isNotBlank()) {
-                        TeacherMessageBubble(subject = selectedSubject) {
+                        TeacherMessageBubble(
+                            subject = selectedSubject,
+                            chatMode = chatMode
+                        ) {
                             SelectionContainer {
                                 AssistantAnswer(
                                     text = answer,
@@ -189,12 +197,15 @@ internal fun TutorResultScreen(
                             }
                         }
                     } else {
-                        TypingIndicator(subject = selectedSubject)
+                        TypingIndicator(subject = selectedSubject, chatMode = chatMode)
                     }
                 }
             } else if (answer.isNotBlank()) {
                 // 스트리밍 중인 답변 (아직 messages로 이동 전)
-                TeacherMessageBubble(subject = selectedSubject) {
+                TeacherMessageBubble(
+                    subject = selectedSubject,
+                    chatMode = chatMode
+                ) {
                     SelectionContainer {
                         AssistantAnswer(
                             text = answer,
@@ -203,7 +214,7 @@ internal fun TutorResultScreen(
                     }
                 }
             } else if (isAnalyzing) {
-                TypingIndicator(subject = selectedSubject)
+                TypingIndicator(subject = selectedSubject, chatMode = chatMode)
             } else {
                 EmptyAnswerPlaceholder(
                     capturedImageAvailable = capturedImageAvailable,
@@ -235,11 +246,12 @@ internal fun TutorResultScreen(
 private fun TutorStatusCard(
     tutorState: TutorUiState,
     canRetryAnalysis: Boolean,
-    progressExpanded: Boolean,
+        progressExpanded: Boolean,
     onToggleProgress: () -> Unit,
     onCancelGeneration: () -> Unit,
     onRetryAnalysis: () -> Unit,
-    onRecoverTutor: () -> Unit
+    onRecoverTutor: () -> Unit,
+    chatMode: Boolean = false
 ) {
     when {
         tutorState.requiresRecovery -> {
@@ -317,6 +329,8 @@ private fun TutorStatusCard(
         }
 
         tutorState.isCompleted -> {
+            // 자유 대화 모드는 상태 카드를 표시하지 않습니다. 일반 채팅처럼 답변만 남깁니다.
+            if (!chatMode) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -355,6 +369,7 @@ private fun TutorStatusCard(
                         ProgressDetails(tutorState.progressMessages)
                     }
                 }
+            }
             }
         }
     }
