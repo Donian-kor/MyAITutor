@@ -9,3 +9,7 @@ captures/
 .externalNativeBuild/
 .cxx/
 *.litertlm
+
+# 설계·기획 문서 (작업용이므로 버전 관리에서 제외)
+/MyAITutor_개선안.md
+/구현계획서.md
