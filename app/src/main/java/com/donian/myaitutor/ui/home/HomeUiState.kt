@@ -13,6 +13,26 @@ enum class ImageAnalysisStage {
 }
 
 /**
+ * 앱 시작 시 보여주는 모델 로딩 화면의 엔진 준비 상태.
+ *
+ * 모델 파일 다운로드 상태([com.donian.myaitutor.model.ModelDownloadStatus])와는 별개로,
+ * LiteRT-LM 엔진/Conversation을 실제로 메모리에 올리는 과정을 나타냅니다.
+ */
+enum class ModelWarmupState {
+    /** 아직 워밍업을 시작하지 않았습니다. */
+    IDLE,
+
+    /** 엔진과 대화를 준비하는 중입니다. */
+    LOADING,
+
+    /** 엔진 준비가 끝나 바로 사용할 수 있습니다. */
+    READY,
+
+    /** 엔진 준비에 실패했습니다. */
+    FAILED
+}
+
+/**
  * 홈 화면의 데이터 상태. Composable은 이 상태를 구독해서 그리기만 합니다.
  * 네비게이션/권한 등 UI-only 상태는 Composer 쪽에 남습니다.
  */
@@ -36,5 +56,9 @@ data class HomeUiState(
     /** 학년의 단일 원본. 별도 ViewModel/저장소를 만들지 않습니다. */
     val selectedGrade: TutorGrade = TutorGrade.ELEMENTARY,
     /** UI 진행 정보만 담습니다. 해설 원본은 [answer]입니다. */
-    val tutorState: TutorUiState = TutorUiState()
+    val tutorState: TutorUiState = TutorUiState(),
+    /** 시작 로딩 화면이 구독하는 엔진 워밍업 상태. */
+    val warmup: ModelWarmupState = ModelWarmupState.IDLE,
+    /** 크롭 및 이미지 전처리 완료 후 OCR에 전달되기 전의 이미지. */
+    val preprocessedImage: File? = null
 )

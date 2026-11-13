@@ -1,6 +1,8 @@
 package com.donian.myaitutor.tutor
 
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -39,24 +41,34 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.exifinterface.media.ExifInterface
 import com.donian.myaitutor.R
 import com.donian.myaitutor.ai.TutorGrade
+import com.donian.myaitutor.camera.ExifImageTransform
 import com.donian.myaitutor.ui.home.FollowUpChips
 import com.donian.myaitutor.ui.text.AssistantAnswer
 import com.donian.myaitutor.ui.text.parseAnswerWithSuggestions
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * 실시간 AI 선생님 화면. 학년 칩, 진행 상태 카드, 접기·펼치기 진행 내역,
@@ -71,6 +83,8 @@ internal fun TutorResultScreen(
     selectedGrade: TutorGrade,
     onGradeSelected: (TutorGrade) -> Unit,
     ocrText: String,
+    /** 크롭/전처리가 끝난 OCR 입력 이미지. 미리보기 표시용이며 null이면 생략한다. */
+    preprocessedImage: File? = null,
     capturedImageAvailable: Boolean,
     modelReady: Boolean,
     isAnalyzing: Boolean,
@@ -136,8 +150,8 @@ internal fun TutorResultScreen(
                 .verticalScroll(answerScrollState),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (ocrText.isNotBlank()) {
-                OcrTextDisclosure(text = ocrText)
+            if (ocrText.isNotBlank() || preprocessedImage != null) {
+                OcrTextDisclosure(text = ocrText, imageFile = preprocessedImage)
             }
             when {
                 answer.isNotBlank() -> {
@@ -472,8 +486,8 @@ private fun EmptyAnswerPlaceholder(
 }
 
 @Composable
-private fun OcrTextDisclosure(text: String) {
-    var expanded by remember(text) { mutableStateOf(false) }
+private fun OcrTextDisclosure(text: String, imageFile: File?) {
+    var expanded by remember(text, imageFile) { mutableStateOf(false) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -504,15 +518,77 @@ private fun OcrTextDisclosure(text: String) {
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             )
             if (expanded) {
-                SelectionContainer {
-                    Text(
-                        text,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.padding(8.dp)
-                    )
+                if (imageFile != null) {
+                    OcrInputImagePreview(imageFile)
+                }
+                if (text.isNotBlank()) {
+                    SelectionContainer {
+                        Text(
+                            text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+/** OCR에 전달되기 직전의 크롭·전처리 이미지를 접기 카드 안에서 보여줍니다. */
+@Composable
+private fun OcrInputImagePreview(imageFile: File) {
+    val preview by produceState<ImageBitmap?>(initialValue = null, imageFile) {
+        value = withContext(Dispatchers.IO) { decodeOcrPreview(imageFile) }
+    }
+    val bitmap = preview ?: return
+    Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+        Text(
+            stringResource(R.string.ocr_preprocessed_image_title),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+        Spacer(Modifier.height(6.dp))
+        Image(
+            bitmap = bitmap,
+            contentDescription = stringResource(R.string.ocr_preprocessed_image_title),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp)),
+            contentScale = ContentScale.Fit
+        )
+    }
+}
+
+/** 미리보기 최대 장변(px). 원본 해상도 그대로 올리지 않아 OOM을 막습니다. */
+private const val OCR_PREVIEW_MAX_SIDE_PX = 1280
+
+/** 반드시 IO 스레드에서 호출합니다. */
+private fun decodeOcrPreview(file: File): ImageBitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= OCR_PREVIEW_MAX_SIDE_PX) {
+        sample *= 2
+    }
+    val bitmap = BitmapFactory.decodeFile(
+        file.absolutePath,
+        BitmapFactory.Options().apply { inSampleSize = sample }
+    ) ?: return null
+
+    val oriented = try {
+        val orientation = ExifInterface(file.absolutePath).getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL
+        )
+        ExifImageTransform.fromOrientation(orientation).apply(bitmap)
+    } catch (_: Exception) {
+        bitmap
+    }
+    if (oriented !== bitmap) bitmap.recycle()
+    return oriented.asImageBitmap()
 }

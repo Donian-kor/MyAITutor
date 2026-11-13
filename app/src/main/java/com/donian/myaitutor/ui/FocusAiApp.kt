@@ -11,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -26,6 +27,9 @@ import com.donian.myaitutor.ui.camera.CameraRoute
 import com.donian.myaitutor.ui.home.HomeScreen
 import com.donian.myaitutor.ui.home.HomeViewModel
 import com.donian.myaitutor.ui.home.HomeViewModelHost
+import com.donian.myaitutor.ui.home.ModelWarmupState
+import com.donian.myaitutor.ui.loading.ModelLoadingScreen
+import com.donian.myaitutor.ui.loading.resolveModelLoadingPhase
 import com.donian.myaitutor.ui.settings.SettingsScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -44,6 +48,8 @@ fun FocusAiApp() {
 
     var showSettings by remember { mutableStateOf(false) }
     var showCamera by remember { mutableStateOf(false) }
+    /** 첫 화면(모델 로딩)을 통과했는지 여부. "나중에 하기"도 여기에 반영됩니다. */
+    var showMain by rememberSaveable { mutableStateOf(false) }
     var selectedSubject by remember { mutableStateOf("수학") }
     var cameraGranted by remember {
         mutableStateOf(
@@ -101,7 +107,30 @@ fun FocusAiApp() {
         }
     }
 
-    if (showSettings) {
+    // 엔진 준비가 끝나면 자동으로 메인 화면으로 이동합니다.
+    LaunchedEffect(uiState.warmup) {
+        if (uiState.warmup == ModelWarmupState.READY) {
+            showMain = true
+        }
+    }
+
+    val loadingPhase = resolveModelLoadingPhase(uiState.modelSnapshot, uiState.warmup)
+
+    if (!showMain) {
+        ModelLoadingScreen(
+            phase = loadingPhase,
+            snapshot = uiState.modelSnapshot,
+            onDownload = { viewModel.startDownload() },
+            onRetry = {
+                if (uiState.modelSnapshot.status == ModelDownloadStatus.READY) {
+                    viewModel.retryModelWarmup()
+                } else {
+                    viewModel.startDownload()
+                }
+            },
+            onSkip = { showMain = true }
+        )
+    } else if (showSettings) {
         SettingsScreen(
             snapshot = uiState.modelSnapshot,
             backendLabel = uiState.backendLabel,
@@ -133,6 +162,7 @@ fun FocusAiApp() {
             onOpenCamera = ::openCamera,
             answer = uiState.answer,
             ocrText = uiState.ocrText,
+            preprocessedImage = uiState.preprocessedImage,
             inputText = uiState.inputText,
             onInputChange = { viewModel.onInputChange(it) },
             isAnalyzing = uiState.isAnalyzing,

@@ -76,6 +76,9 @@ class HomeViewModel(
     private var generationJob: Job? = null
     private var generationId = 0
 
+    /** 엔진 워밍업 중복 실행을 막는 Job. 시작 로딩 화면이 이 상태를 구독합니다. */
+    private var warmupJob: Job? = null
+
     /** 사용자가 중단을 요청한 generationId. 정상 오류와 취소를 구분합니다. */
     private var userCancelledGeneration: Int? = null
 
@@ -114,6 +117,8 @@ class HomeViewModel(
         tutorEngine.cancelGeneration()
         generationJob?.cancel()
         generationJob = null
+        warmupJob?.cancel()
+        warmupJob = null
         scope.launch { runCatching { tutorEngine.release() } }
     }
 
@@ -151,6 +156,7 @@ class HomeViewModel(
         _state.value = _state.value.copy(
             capturedImage = null,
             cameraCapturedImage = null,
+            preprocessedImage = null,
             answer = "",
             inputText = "",
             analysisStage = null,
@@ -182,6 +188,7 @@ class HomeViewModel(
             capturedImage = image,
             cameraCapturedImage = null,
             cameraError = null,
+            preprocessedImage = null,
             analysisStage = null,
             ocrText = "",
             ocrBlocks = emptyList(),
@@ -203,7 +210,10 @@ class HomeViewModel(
         _state.value.cameraCapturedImage?.let { file ->
             runCatching { if (file.exists()) file.delete() }
         }
-        _state.value = _state.value.copy(cameraCapturedImage = null, cameraError = null)
+        _state.value.preprocessedImage?.let { file ->
+            runCatching { if (file.exists()) file.delete() }
+        }
+        _state.value = _state.value.copy(cameraCapturedImage = null, cameraError = null, preprocessedImage = null)
     }
 
     fun analyzeImage(image: File, subject: String, selection: ImageSelection? = null) {
@@ -248,6 +258,20 @@ class HomeViewModel(
                     }
                     imageToAnalyze = normalizedImage ?: image
                 }
+
+                // 크롭·전처리가 끝난 이미지를 그대로 보존해 "OCR 전달 이미지"로 노출합니다.
+                // 별도 복사를 만들지 않고, 이 시점부터 이 파일의 소유권은 preprocessedImage가 가집니다.
+                if (currentGeneration == generationId) {
+                    val previousPreview = _state.value.preprocessedImage
+                    if (previousPreview != null &&
+                        previousPreview != image &&
+                        previousPreview != normalizedImage
+                    ) {
+                        runCatching { if (previousPreview.exists()) previousPreview.delete() }
+                    }
+                    _state.value = _state.value.copy(preprocessedImage = imageToAnalyze)
+                }
+
                 val ocrBlocks = ocrTextRecognizer.recognize(imageToAnalyze)
                 // TODO: OCR 결과 텍스트의 Logcat 출력을 디버깅 종료 후 제거하세요.
                 val ocrText = formatOcrBlocksForPrompt(ocrBlocks)
@@ -328,11 +352,11 @@ class HomeViewModel(
                 }
             } finally {
                 // 1) 원본 촬영 이미지는 재분석을 위해 보존
-                // 2) 임시 파일만 정리 (전처리, 크롭 결과)
-                if (normalizedImage != null && normalizedImage != image) {
+                // 2) 임시 파일만 정리 (전처리, 크롭 결과 - preprocessedImage가 가리키는 파일은 보존)
+                if (normalizedImage != null && normalizedImage != image && normalizedImage != _state.value.preprocessedImage) {
                     runCatching { if (normalizedImage.exists()) normalizedImage.delete() }
                 }
-                if (imageToAnalyze != image && imageToAnalyze != normalizedImage) {
+                if (imageToAnalyze != image && imageToAnalyze != _state.value.preprocessedImage) {
                     runCatching { if (imageToAnalyze.exists()) imageToAnalyze.delete() }
                 }
                 // 3) UI 상태 복구를 부가 작업보다 먼저 보장
@@ -576,33 +600,61 @@ class HomeViewModel(
 
     fun deleteModel() {
         scope.launch {
+            warmupJob?.cancel()
+            warmupJob = null
             tutorEngine.release()
             modelManager.deleteModel()
             _state.value = _state.value.copy(
                 modelSnapshot = modelManager.snapshot(),
-                backendLabel = stringProvider.get(R.string.status_model_deleted)
+                backendLabel = stringProvider.get(R.string.status_model_deleted),
+                warmup = ModelWarmupState.IDLE
             )
         }
     }
 
+    /**
+     * 모델 파일이 준비된 경우 엔진/대화를 미리 메모리에 올립니다.
+     *
+     * 시작 로딩 화면이 [HomeUiState.warmup]을 구독해 진행 상태를 그립니다.
+     * 중복 호출되어도 Job은 하나만 실행되며, 이미 준비된 경우 아무 것도 하지 않습니다.
+     */
     fun preWarmIfNeeded() {
-        scope.launch {
-            if (_state.value.modelSnapshot.status == ModelDownloadStatus.READY) {
-                runCatching { tutorEngine.preWarm() }
-                    .onFailure { error ->
-                        _state.value = _state.value.copy(
-                            statusMessage = error.localizedMessage
-                                ?: stringProvider.get(R.string.status_model_prewarm_failed)
-                        )
-                    }
+        val current = _state.value
+        if (current.warmup == ModelWarmupState.LOADING || current.warmup == ModelWarmupState.READY) return
+        if (warmupJob?.isActive == true) return
+        if (current.modelSnapshot.status != ModelDownloadStatus.READY) return
+
+        _state.value = _state.value.copy(warmup = ModelWarmupState.LOADING)
+        warmupJob = scope.launch {
+            try {
+                tutorEngine.preWarm()
                 _state.value = _state.value.copy(
+                    warmup = ModelWarmupState.READY,
                     backendLabel = stringProvider.get(
                         R.string.backend_label,
                         tutorEngine.backendLabel()
                     )
                 )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(
+                    warmup = ModelWarmupState.FAILED,
+                    statusMessage = error.localizedMessage
+                        ?: stringProvider.get(R.string.status_model_prewarm_failed)
+                )
+            } finally {
+                warmupJob = null
             }
         }
+    }
+
+    /** 로딩 화면의 "다시 시도" 버튼. 실패 상태를 초기화하고 워밍업을 다시 시작합니다. */
+    fun retryModelWarmup() {
+        warmupJob?.cancel()
+        warmupJob = null
+        _state.value = _state.value.copy(warmup = ModelWarmupState.IDLE)
+        preWarmIfNeeded()
     }
 
     fun clearCache() {
@@ -618,6 +670,7 @@ class HomeViewModel(
                 count
             }
             _state.value = _state.value.copy(
+                preprocessedImage = null,
                 statusMessage = if (clearedCount > 0) {
                     stringProvider.get(R.string.status_cache_cleared, clearedCount)
                 } else {

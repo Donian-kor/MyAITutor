@@ -96,6 +96,9 @@
     <string name="home_ocr_show">PaddleOCR 인식 내용 보기</string>
     <string name="home_ocr_hide">PaddleOCR 인식 내용 숨기기</string>
     <string name="home_ocr_explanation">Gemma 4 E4B는 사진을 직접 읽지 않고, 아래 PaddleOCR 인식 텍스트를 받아 풀이합니다.</string>
+    <string name="ocr_preprocessed_image_title">OCR 전달 전 크롭/전처리된 이미지</string>
+    <string name="home_photo_show">촬영 및 선택한 사진 보기</string>
+    <string name="home_photo_hide">촬영 및 선택한 사진 숨기기</string>
     <string name="home_empty_capture_prompt">문제를 촬영해 주세요.</string>
     <string name="home_empty_answer_placeholder">AI 풀이가 여기에 표시됩니다.</string>
     <string name="home_empty_hint_after_capture">상단에서 과목을 선택하고 카메라를 누르면 나만의 AI 쌤이 바로 도와드려요.</string>
@@ -140,6 +143,21 @@
     <string name="dl_msg_no_storage">저장 공간이 부족합니다. 약 4.3GB 이상의 여유 공간을 확보해 주세요.</string>
     <string name="dl_notification_title">나만의 AI쌤 모델 다운로드</string>
     <string name="dl_notification_desc">Gemma 4 E4B-IT · 약 3.66GB · Wi-Fi 전용</string>
+
+    <!-- 시작 로딩 화면 -->
+    <string name="loading_title">선생님이 수업을 준비중이에요.</string>
+    <string name="loading_desc_download_required">AI 모델을 설치하면 바로 문제 풀이를 시작할 수 있어요.</string>
+    <string name="loading_desc_downloading">AI 모델을 다운로드하고 있어요. Wi-Fi 연결을 확인해 주세요.</string>
+    <string name="loading_desc_verifying">내려받은 모델이 올바른지 확인하고 있어요.</string>
+    <string name="loading_desc_ready">준비가 끝났어요. 곧 수업을 시작합니다.</string>
+    <string name="loading_desc_failed">준비하는 중에 문제가 생겼어요.</string>
+    <string name="loading_progress_percent">%1$d%%</string>
+    <string name="loading_progress_bytes">%1$s / %2$s</string>
+    <string name="loading_progress_wait">수업준비가 금방 끝나요…</string>
+    <string name="loading_btn_download">AI 모델 다운로드</string>
+    <string name="loading_btn_retry">다시 시도</string>
+    <string name="loading_btn_skip">나중에 하기</string>
+
     <!-- 실행 상태 -->
     <string name="backend_label">실행 백엔드: %1$s</string>
 </resources>
