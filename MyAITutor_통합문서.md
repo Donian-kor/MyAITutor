@@ -63,6 +63,40 @@
 | 병렬 빌드/캐시 | `org.gradle.parallel=true`, `org.gradle.caching=true` | `org.gradle.tooling.parallel=true` (Gradle 9.4+) |
 | 기타 | `android.useAndroidX=true`, `android.nonTransitiveRClass=true`, `kotlin.code.style=official` | |
 
+---
+
+## 0. 작업 진행 상태 요약
+
+아래는 문서에 등재된 문제점·개선 후보 중 현재 진행 상태를 구별하기 위한 표입니다.
+
+| 상태 | 항목 | 문서 위치 | 비고 |
+|:---:|---|---|---|
+| [완료] | Qwen 엔진 초기화 경로 SHA-256 검증 강제 | 13.2-3 | `isFileVerified()` 추가 및 초기화 경로에서 요구 |
+| [완료] | OCR 원문 Logcat 출력을 DEBUG 빌드로 제한 | 13.1-4 | `BuildConfig.DEBUG` 조건부 |
+| [완료] | `HomeViewModel.close()` `runBlocking` 제거 (ANR 위험 해소) | 13.1-1 | 별도 daemon 스레드 스코프에서 비동기 해제 |
+| [완료] | Gemma 최소 모델 크기 기준 단일 원본화 | 13.1-2 | `MIN_MODEL_BYTES` internal 노출 |
+| [완료] | Assistant 레거시 콜백 API 제거 (학년 하드코딩 해소) | 13.2-8 | `analyzeImage`/`askFollowUp`/`collectLegacy` 삭제 |
+| [완료] | 컨텍스트 토큰 표기를 선택 모델 기준으로 분기 | 13.3 | `HomeUiState.maxContextTokens` 계산 속성 |
+| [완료] | 진행 단계 상세 문구 모델명 분기 | 10.3 | `home_stage_model_detail` %1$s 치환 |
+| [완료] | Qwen 2,048 컨텍스트 예산 강제 (입력 축약 + 초과 안내) | 10.3 | `QwenContextBudget` + 12개 단위 테스트 |
+| [완료] | Qwen 선택 시 생각 모드 카드 비활성화 | 10.3 | `thinkingSupported` 스위치 |
+| [완료] | Qwen 다운로드 시작 시 가용 메모리 확인 | 10.3 | `canStartDownload` + 저장소/메모리 판정 |
+| [완료] | Qwen 검증 캐시를 파일 지문(크기·수정시각)에 바인딩 | 5.3 / 13.3 | 파일 교체 시 재검증 |
+| [완료] | 설정 화면에 LiteRT-LM 런타임 버전 표시 | 10.3 | `BuildConfig.LITERTLM_VERSION` |
+| [완료] | Linux gradlew 버전을 wrapper(9.6.0)와 일치 | 13.3 | `GRADLE_VERSION` 9.3.1 → 9.6.0 |
+| [완료] | 크롭 파일명에 UUID 추가 (충돌 방지) | 13.3 | `ImageCropper` |
+| [완료] | ppocr-sdk JVM 단위 테스트 도입 (39개) | 13.3 | CTCDecoder·BoxSorter·QuadGeometry·MathUtils·YamlUtils |
+| [완료] | 모델 복구 다이얼로그 노출 규칙 테스트 | 11.3 | `isNoModelRecoveryRequired` 3개 테스트 |
+| [완료] | THIRD_PARTY_NOTICES 구성요소별 표 재정리 | — | Qwen·LiteRT-LM 추가 |
+| [완료] | MyAITutor 통합 기술 문서 추가 | — | 4개 문서 통합 정리 |
+| [미진행] | `HomeViewModel` 단일 파일 분리 (1,188줄) | 13.2-7 | 대규모 리팩터링, 별도 승인 필요 |
+| [보류] | Gemma 해시 검증 I/O 오류 처리 (현재 상태 유지) | 13.4 | 사용자 결정: 완화(완전 보존), 별도 승인 시 재검토 |
+| [미진행] | 실기기 테스트 전 항목 (11.4) | 11.4 | 모든 수정 완료 후 마지막 단계 |
+| [보류] | 다크 테마 도입 (도입 계획 없음) | 13.3 | 사용자 결정: 도입 계획 없음, 별도 승인 시 재검토 |
+| [미진행] | Qwen 2,048 예산 추정치 실제 토크나이저 검증 | 10.3 | 단위 테스트와 함께 실제 기기 검증 필요 |
+
+---
+
 **버전 관리:** `versionCode` = Git 커밋 수, `versionName` = `MAJOR.MINOR.PATCH` (`커밋/100` . `(커밋%100)/10` . `커밋%10`).
 `.git`이 없는 환경에서 빌드하면 `gitCommitCount`가 1로 폴백한다. 현재 HEAD는 커밋 99개이므로 `0.9.9`다.
 
@@ -890,108 +924,27 @@ data class OcrBlock(
 
 ### 13.1 Critical
 
-#### 1. `HomeViewModel.close()`에서 `runBlocking` 사용
+#### 1. `HomeViewModel.close()`에서 `runBlocking` 사용 — **[완료]**
 
-```kotlin
-fun close() {
-    // ...
-    runCatching {
-        runBlocking {
-            withTimeoutOrNull(ENGINE_RELEASE_WAIT_MS) {
-                tutorEngine.awaitGenerationStopped(ENGINE_RELEASE_WAIT_MS)
-            }
-            tutorEngine.release()
-        }
-    }
-}
-```
+종료 시 최대 3초간 UI 스레드를 대기시켜 ANR 위험이 있었던 `runBlocking`을 별도 daemon 스레드 스코프(`shutdownScope`)에서 비동기로 처리하는 것으로 수정했다. 호출 스레드를 막지 않으면서 scope 취소와 무관하게 엔진 해제를 끝까지 보장한다. 단위 테스트(`close는 UI 스레드를 막지 않고 엔진을 한 번만 해제한다`)로 결정적으로 검증했다.
 
-**근거:** `HomeViewModelHost.onCleared()` → `homeViewModel.close()` → `FocusAiApp`의 BackHandler에서 `viewModel.close()` 후 `finishAndRemoveTask()`.
+#### 2. Gemma 모델 크기 검증값 중복 정의 — **[완료]**
 
-**영향:** `ENGINE_RELEASE_WAIT_MS = 3_000L`이므로 최대 3초간 호출 스레드가 대기한다. Activity `onDestroy` 경로에서 호출되면 ANR로 이어질 수 있다.
-
-**참고:** `close()` 상단에 이미 "종료 시점에는 viewModelScope가 이미 취소된 상태일 수 있으므로 scope.launch 대신 동기적으로 release()를 끝까지 실행합니다"라는 의도 주석이 있다. 즉 비동기화가 의도적으로 회피된 코드다. 개선 시 이 제약(엔진 해제를 끝까지 보장)을 유지해야 한다.
-
-**개선 방향:** `release()`를 별도 백그라운드 스레드/`CoroutineScope(Dispatchers.IO)`로 위임하고 최대 대기 시간을 줄이거나, Activity `onDestroy`에서 콜백 기반으로 완료 후 `finishAndRemoveTask()`를 호출한다.
-
-#### 2. Gemma 모델 크기 검증값 중복 정의
-
-```kotlin
-// GemmaAssistant.ensureInitializedOnRuntimeThread()
-require(modelFile.isFile && modelFile.length() >= 3_500_000_000L) { ... }
-
-// ModelDownloadManager.companion
-private const val MIN_MODEL_BYTES = 3_500_000_000L
-```
-
-**영향:** 같은 값이 두 곳에 하드코딩되어 있다. `MIN_MODEL_BYTES`가 `private`이라 `GemmaAssistant`가 참조할 수 없다.
-
-**개선 방향:** `MIN_MODEL_BYTES`를 `internal` 또는 `const val`(public)로 노출하고 `GemmaAssistant`가 참조하도록 한다. 단 `ModelDownloadManager.kt`는 Gemma 보존 대상이므로 변경 범위를 최소화해야 한다.
-
-> [!NOTE]
-> `QwenAssistant`는 동일 문제에서 자유롭다. `QwenModelDownloadManager.EXPECTED_MODEL_BYTES`(public)를 참조한다.
+`ModelDownloadManager.MIN_MODEL_BYTES`를 `internal`로 노출하고 `GemmaAssistant`가 이 단일 원본을 참조하도록 했다. 동작 변화 없는 가시성 변경 1줄 + 참조 교체로 완료했다.
 
 ### 13.2 Major
 
-#### 3. `QwenAssistant` 초기화 시 SHA 검증 미강제 — **미완성 (계획서 요구사항 미충족)**
+#### 3. `QwenAssistant` 초기화 시 SHA 검증 미강제 — **[완료]**
 
-계획서 3.2의 P1 항목은 다음을 요구한다.
+`QwenModelDownloadManager.isFileVerified()`를 추가하고 `QwenAssistant.ensureInitializedOnRuntimeThread()`에서 크기뿐 아니라 저장된 SHA-256 검증 완료 상태까지 요구하도록 했다. 크기만 일치하는 손상된/부분 파일로 엔진이 초기화되는 경로를 차단했다.
 
-> Qwen 엔진 생성자/초기화 경로에서 **Qwen 전용 검증 완료 상태를 강제**한다.
+#### 4. OCR 원문 Logcat 출력 — **[완료]**
 
-현재 코드는 크기만 확인한다.
+OCR 문제 전문이 DEBUG 빌드에서만 Logcat에 기록되도록 `BuildConfig.DEBUG` 조건부로 변경했다. Release 빌드에서는 개인정보가 로그에 남지 않도록 했다. `// TODO` 주석도 제거했다.
 
-```kotlin
-// QwenAssistant.ensureInitializedOnRuntimeThread()
-require(modelFile.isFile && modelFile.length() == QwenModelDownloadManager.EXPECTED_MODEL_BYTES) {
-    "Qwen3-4B-Instruct-2507 모델이 설치되지 않았습니다. 설정에서 모델을 다운로드해 주세요."
-}
-```
+#### 5. `CameraPreview`의 카메라 초기화 대기 — **[완료]**
 
-`needsHashVerification()` / `verifyModelHash()`는 `HomeViewModel`의 폴링 루프와 `refreshModelSnapshot()`에서만 호출되며, **엔진 초기화 경로와 연결되어 있지 않다.** `isModelReady()`도 사용하지 않는다.
-
-**영향:** 크기만 일치하는 손상된/부분 파일로 엔진이 초기화될 수 있다. 다만 UI 경로(`setSelectedModel`)는 `snapshotFor(target).status == ModelDownloadStatus.READY`를 요구하고, `READY`는 SHA 검증 완료를 포함하므로 정상 UI 경로로는 우회가 어렵다. 초기화 경로 자체에 방어가 없다는 것이 문제다.
-
-**개선 방향:** `require` 조건에 `QwenModelDownloadManager.isModelReady()` 또는 SHA 검증 완료 확인을 추가한다.
-
-```kotlin
-// 개선 예시
-val manager = QwenModelDownloadManager(appContext)
-require(manager.isModelReady()) { "모델 검증이 완료되지 않았습니다." }
-```
-
-> [!NOTE]
-> 이 항목은 이전 판에서 계획서 3.2 표에 "완료"로 잘못 기재되어 있었다. 실제 코드는 요구사항을 충족하지 않으므로 9.3(미완성)과 12.2(Major)에 동시 등재했다.
-
-#### 4. OCR 원문 Logcat 출력
-
-```kotlin
-private val ocrLogger: (String) -> Unit = { Log.d(TAG, "OCR 결과:\n$it") },
-// ...
-ocrLogger(ocrText)
-```
-
-`analyzeImage` 경로에서 OCR 문제 전문을 기록한다. 사진에 개인정보가 포함되면 로그로 노출될 수 있다. 코드에 `// TODO: OCR 결과 텍스트의 Logcat 출력을 디버깅 종료 후 제거하세요.` 주석이 있다.
-
-**개선 방향:** `BuildConfig.DEBUG` 조건부 활성화 또는 제거.
-
-#### 5. `CameraPreview`의 카메라 초기화 대기
-
-```kotlin
-DisposableEffect(context, lifecycleOwner, previewView) {
-    val providerFuture = ProcessCameraProvider.getInstance(context)
-    // ...
-    val listener = Runnable {
-        val provider = providerFuture.get()   // Future.get() — 대기 가능
-        if (disposed) return@Runnable
-        // ...
-    }
-}
-```
-
-`Future.get()`은 `Handler.post`된 `Runnable` 내부에서 호출되므로 UI 스레드를 직접 블로킹하지는 않는다. 다만 `disposed`가 true로 바뀐 뒤에도 `get()`이 반환될 때까지 Runnable이 대기하며, 카메라 프로바이더 초기화가 지연되면 화면 이탈 후에도 대기 스레드가 남는다.
-
-**개선 방향:** `providerFuture.addListener(Runnable { ... }, ContextCompat.getMainExecutor(context))` 패턴으로 전환.
+실제 코드에서 `providerFuture.addListener(listener, ContextCompat.getMainExecutor(context))` 패턴으로 이미 전환되어 있다. `Future.get()`이 핸들러 Runnable 내부에서 호출되므로 UI 스레드를 직접 블로킹하지 않으며, `disposed` 플래그로 화면 이탈 후 대기 스레드 해제도 처리한다. 문서 상의 이슈는 해결됨.
 
 #### 6. `HomeViewModel`의 취소/재시도 상태 변수 다수
 
@@ -1007,7 +960,7 @@ DisposableEffect(context, lifecycleOwner, previewView) {
 
 **개선 방향:** 사용자 요청 시 별도 작업으로 진행. 분리 시 `HomeViewModelTest` 44개가 회귀 기준선이 된다.
 
-#### 8. `GemmaAssistant` legacy 콜백 API의 학년 하드코딩
+#### 8. `GemmaAssistant` legacy 콜백 API의 학년 하드코딩 — **[완료]**
 
 ```kotlin
 // GemmaAssistant L191, L208 — Assistant 인터페이스 호환용
@@ -1031,7 +984,7 @@ override suspend fun askFollowUp(...) = collectLegacy(
 | 항목 | 내용 | 비고 |
 |---|---|---|
 | `deleteSelectedModel` 미사용 + `deleteModelFile`과 동작 불일치 | `deleteModelFile(model)`은 활성 모델 삭제 시 `awaitGenerationStopped` → `release()` → `warmupJob` 취소를 수행. `deleteSelectedModel()`은 주석에 "먼저 엔진을 해제한다"고 적혀 있으나 **실제로는 `manager.deleteModel()`만 호출**한다. 두 함수 모두 UI에서 미사용이며 실제 경로는 `deleteModelFile(model)` | 죽은 코드 + 주석/구현 불일치. 정리 필요 |
-| 다크 테마 미지원 | `Theme.kt`가 `lightColorScheme`만 정의한다. `isSystemInDarkTheme()`은 `AssistantAnswer`(L31)·`FormulaText`(L35)에서 LaTeX 렌더러 색상 선택에만 사용 | 시스템이 다크 모드여도 앱 UI는 라이트 유지 |
+| 다크 테마 미지원 | `Theme.kt`가 `lightColorScheme`만 정의한다. `isSystemInDarkTheme()`은 `AssistantAnswer`(L31)·`FormulaText`(L35)에서 LaTeX 렌더러 색상 선택에만 사용 | 시스템이 다크 모드여도 앱 UI는 라이트 유지 | **보류** — 도입 계획 없음. 사용자 요청으로 당분간 미진행.
 | Linux `gradlew` / Wrapper 버전 불일치 | `gradle-wrapper.properties`는 9.6.0, Linux `gradlew` 스크립트는 자체 부트스트랩으로 `GRADLE_VERSION="9.3.1"`을 다운로드 | Windows/Android Studio 경로와 Linux CI 경로가 다른 Gradle을 사용 |
 | `ImageCropper` 출력 파일명 | `"focus_crop_${System.currentTimeMillis()}.png"` — 같은 밀리초에 다중 크롭 시 이론적 충돌 가능 | 실측 근거 없음. UUID/카운터 추가 검토 가능 |
 | `FocusAiApp` BackHandler 2개 | `enabled` 조건이 상호 배타적이므로 동시 활성화되지 않는다. 라우팅 의도로 보이며 버그 근거 없음 | 단일 핸들러 통합 시 가독성 향상 여지 |
@@ -1040,12 +993,17 @@ override suspend fun askFollowUp(...) = collectLegacy(
 | `OcrImageEnhancer.sharpen()` 메모리 | `MAX_SHARPEN_PIXELS = 5_000_000` 가드 하에서 `IntArray` 2개 = 약 40MB | 가드가 있으므로 OOM 근거는 불충분. 타일 처리 검토 여지 |
 | `HomeUiState.maxContextTokens` 모델 미분기 | Qwen에서 4,096으로 표시 (10.3 참조) | 코드 수정 필요 |
 
-### 13.4 Gemma 해시 검증의 I/O 오류 처리 (개선 여지)
+### 13.4 Gemma 해시 검증의 I/O 오류 처리 (결정됨: 완화 적용)
 
 > [!IMPORTANT]
-> 이 항목은 **버그가 아니다.** 재검토 결과 기존에 "영구 VERIFYING" 또는 "버그 수정"으로 분류한 것은 부정확했다.
-> `ModelDownloadManager.kt`는 계획서 0.1의 Gemma 보존 대상이며, 현재 동작은 실기기 검증이 끝난 상태다.
-> 아래는 설계 미비와 성능 개선 여지로만 기록한다.
+> **사용자 결정:** I/O 오류 처리 개선을 **완화(완전 보존)** 방향으로 진행한다.
+> `ModelDownloadManager.kt`는 계획서 0.1의 Gemma 보존 대상이다. 현재 동작(실기기 검증 완료)을 유지하고,
+> 아래 미비를 해결하지 않는 것으로 결정했다. 별도 승인 시 재검토.
+>
+> 검토 보류된 개선 방향:
+> - `catch`에서 I/O 오류를 별도 키로 기록해 `snapshot()`이 재시도 가능/불가능을 구분
+> - 검증 재시도에 백오프(예: 5초 → 30초 → 5분) 적용
+> - Gemma 크기 판정을 Qwen과 동일한 정확 일치로 통일
 
 **현재 동작** ([verifyModelHash()](file:///C:/Users/donian/Desktop/android_app/MyAITutor/app/src/main/java/com/donian/myaitutor/model/ModelDownloadManager.kt#L194))
 
