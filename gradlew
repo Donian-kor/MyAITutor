@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
 set -eu
-GRADLE_VERSION="9.3.1"
+# gradle-wrapper.properties의 distributionUrl과 버전을 맞춰 CI(Linux)와 Android Studio(Windows)가
+# 같은 Gradle을 쓰도록 합니다.
+GRADLE_VERSION="9.6.0"
 GRADLE_HOME="${HOME}/.gradle/focus-ai-bootstrap/gradle-${GRADLE_VERSION}"
 if [ ! -x "${GRADLE_HOME}/bin/gradle" ]; then
   echo "[MyAITutor] Gradle ${GRADLE_VERSION} is not installed. Downloading it now..."

@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import androidx.exifinterface.media.ExifInterface
 import java.io.File
 import java.io.FileOutputStream
+import java.util.UUID
 
 object ImageCropper {
     /**
@@ -31,7 +32,8 @@ object ImageCropper {
         }
         if (oriented !== decoded) decoded.recycle()
 
-        val output = File(source.parentFile, "focus_crop_${System.currentTimeMillis()}.png")
+        // 같은 밀리초에 여러 번 크롭해도 파일이 덮어써지지 않도록 UUID를 붙인다.
+        val output = File(source.parentFile, "focus_crop_${System.currentTimeMillis()}_${UUID.randomUUID()}.png")
         var cropped: Bitmap? = null
         try {
             val padding = (minOf(oriented.width, oriented.height) * PADDING_RATIO)
