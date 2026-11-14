@@ -199,7 +199,9 @@ internal fun SettingsScreen(
             ) {
                 ThinkingModeCard(
                     thinkingMode = thinkingMode,
-                    onThinkingModeChange = onThinkingModeChange
+                    onThinkingModeChange = onThinkingModeChange,
+                    // Qwen은 ThinkingConfig(false)를 강제하므로 스위치를 비활성화한다.
+                    thinkingSupported = selectedModel != AppModel.QWEN3
                 )
             }
 

@@ -413,12 +413,16 @@ private fun gemmaSnapshotOf(status: ModelDownloadStatus): ModelDownloadSnapshot 
  *
  * 학년과 무관하게 사용자가 직접 켜고 끈다. 켜면 답을 내기 전에 단계를 따져 생각하므로
  * 정확도는 올라가지만 답변이 느려지고 토큰을 더 사용한다.
+ *
+ * Qwen은 Thinking을 항상 끄고 동작하므로 [thinkingSupported]가 false이면 스위치를 비활성화하고
+ * 사유를 안내한다.
  */
 @Composable
 fun ThinkingModeCard(
     thinkingMode: Boolean,
     onThinkingModeChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    thinkingSupported: Boolean = true
 ) {
     val colors = MaterialTheme.colorScheme
     val shapes = MaterialTheme.shapes
@@ -449,12 +453,20 @@ fun ThinkingModeCard(
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Text(
-                    stringResource(R.string.settings_thinking_desc),
+                    if (thinkingSupported) {
+                        stringResource(R.string.settings_thinking_desc)
+                    } else {
+                        stringResource(R.string.settings_thinking_qwen_note)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.onSurfaceVariant
                 )
             }
-            Switch(checked = thinkingMode, onCheckedChange = onThinkingModeChange)
+            Switch(
+                checked = if (thinkingSupported) thinkingMode else false,
+                onCheckedChange = onThinkingModeChange,
+                enabled = thinkingSupported
+            )
         }
     }
 }

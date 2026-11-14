@@ -69,8 +69,9 @@
     <string name="dialog_no_model_fallback_gemma">Gemma로 돌아가기</string>
     <string name="dialog_no_model_later">나중에</string>
     <!-- 추론(Thinking) 모드 -->
-    <string name="settings_thinking_title">Gemma 4 생각 모드</string>
+    <string name="settings_thinking_title">생각 모드</string>
     <string name="settings_thinking_desc">켜면 답을 내기 전에 스스로 단계를 따져 생각한 뒤 답변합니다. 정확도는 올라가지만 답변이 느려지고 토큰을 더 사용합니다. 학년과 무관하게 직접 켜고 끕니다.</string>
+    <string name="settings_thinking_qwen_note">Qwen3는 생각 모드를 지원하지 않습니다. Gemma 4에서만 사용할 수 있어요.</string>
     <string name="settings_current_backend">현재 백엔드: %1$s</string>
     <string name="settings_token_usage">대화 토큰 사용량: %1$d / %2$d 토큰 (출력 제한: %3$d 토큰)</string>
     <string name="settings_btn_clear_cache">임시 파일 캐시 정리</string>
