@@ -101,6 +101,7 @@ internal fun SettingsScreen(
     /** 지정한 모델의 파일을 삭제한다. 활성 모델 삭제 시 엔진이 먼저 해제된다. */
     onDeleteModelFile: (AppModel) -> Unit = { onDeleteModel() }
 ) {
+    var showLicensesDialog by remember { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
     val shapes = MaterialTheme.shapes
     var visible by remember { mutableStateOf(false) }
@@ -199,9 +200,7 @@ internal fun SettingsScreen(
             ) {
                 ThinkingModeCard(
                     thinkingMode = thinkingMode,
-                    onThinkingModeChange = onThinkingModeChange,
-                    // Qwen은 ThinkingConfig(false)를 강제하므로 스위치를 비활성화한다.
-                    thinkingSupported = selectedModel != AppModel.QWEN3
+                    onThinkingModeChange = onThinkingModeChange
                 )
             }
 
@@ -321,132 +320,91 @@ internal fun SettingsScreen(
                 }
             }
 
-            // 5) 임시 파일 캐시 정리
+            // 버전 정보 - 개선된 디자인
             AnimatedVisibility(
                 visible = visible,
                 enter = fadeIn(animationSpec = tween(500, delayMillis = 400))
             ) {
-                OutlinedButton(
-                    onClick = onClearCache,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = shapes.large
+                Surface(
+                    shape = shapes.large,
+                    color = colors.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(stringResource(R.string.settings_btn_clear_cache))
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            stringResource(
+                                R.string.settings_app_version,
+                                BuildConfig.VERSION_NAME
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.onSurfaceVariant
+                        )
+                        Text(
+                            stringResource(R.string.settings_runtime_env),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.onSurfaceVariant
+                        )
+                        Text(
+                            stringResource(R.string.settings_current_backend, backendLabel),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.onSurfaceVariant
+                        )
+                        Text(
+                            stringResource(
+                                R.string.settings_litertlm_version,
+                                BuildConfig.LITERTLM_VERSION
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.onSurfaceVariant
+                        )
+                    }
                 }
             }
-
-            // 6) 오픈소스 라이선스 및 버전 정보 (접기/펼치기)
-            var licensesExpanded by remember { mutableStateOf(false) }
+            // 5) 임시 파일 캐시 정리 / 오픈소스 라이선스 (최하단)
             AnimatedVisibility(
                 visible = visible,
                 enter = fadeIn(animationSpec = tween(500, delayMillis = 500))
             ) {
-                Card(
-                    shape = shapes.large,
-                    colors = CardDefaults.cardColors(containerColor = colors.surface),
-                    border = BorderStroke(1.dp, colors.outlineVariant),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { licensesExpanded = !licensesExpanded }
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                if (licensesExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = null,
-                                tint = colors.onSurfaceVariant
-                            )
-                            Text(
-                                stringResource(R.string.settings_btn_licenses),
-                                fontWeight = FontWeight.SemiBold,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Text(
-                                if (licensesExpanded) "접기" else "펼치기",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = colors.onSurfaceVariant
-                            )
-                        }
-                        AnimatedVisibility(visible = licensesExpanded) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                HorizontalDivider(color = colors.outlineVariant)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = onClearCache,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = shapes.large
+                    ) {
+                        Text(stringResource(R.string.settings_btn_clear_cache))
+                    }
 
-                                Text("버전 정보", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                                Text(
-                                    stringResource(R.string.settings_app_version, BuildConfig.VERSION_NAME),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = colors.onSurfaceVariant
-                                )
-                                Text(
-                                    stringResource(R.string.settings_runtime_env),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = colors.onSurfaceVariant
-                                )
-                                Text(
-                                    stringResource(R.string.settings_current_backend, backendLabel),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = colors.onSurfaceVariant
-                                )
-                                Text(
-                                    stringResource(
-                                        R.string.settings_litertlm_version,
-                                        BuildConfig.LITERTLM_VERSION
-                                    ),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = colors.onSurfaceVariant
-                                )
-
-                                HorizontalDivider(color = colors.outlineVariant)
-
-                                Text("오픈소스 라이선스", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                                Text(
-                                    "배포 APK에 포함된 구성요소 기준 (테스트/디버그 전용 제외)",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = colors.onSurfaceVariant
-                                )
-
-                                val noticeLines = listOf(
-                                    "Gemma 4 E4B-IT LiteRT-LM — Apache 2.0 — https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm",
-                                    "Qwen3-4B-Instruct-2507 LiteRT-LM — Apache 2.0 — https://huggingface.co/litert-community/Qwen3-4B-Instruct-2507",
-                                    "PaddleOCR Android SDK — Apache 2.0 — https://github.com/PaddlePaddle/PaddleOCR/tree/main/deploy/ppocr-android",
-                                    "PP-OCRv5 한국어 인식 모델 — Apache 2.0 — https://www.paddleocr.ai",
-                                    "ONNX Runtime Android 1.21.1 — MIT — https://github.com/microsoft/onnxruntime",
-                                    "OpenCV Android 4.13.0 — Apache 2.0 — https://github.com/opencv/opencv",
-                                    "AndroidX Core KTX 1.19.1 — Apache 2.0",
-                                    "AndroidX Lifecycle 2.11.0 — Apache 2.0",
-                                    "AndroidX Activity Compose 1.13.0 — Apache 2.0",
-                                    "Jetpack Compose BOM 2026.09.00 — Apache 2.0",
-                                    "AndroidX Compose Material Icons Extended — Apache 2.0",
-                                    "AndroidX CameraX 1.6.2 — Apache 2.0",
-                                    "AndroidX ExifInterface 1.4.2 — Apache 2.0",
-                                    "LiteRT-LM Android 0.18.0 — Apache 2.0 — https://github.com/google-ai-edge/LiteRT-LM",
-                                    "Compose LaTeX Renderer 1.7.2 — MIT — https://github.com/huarangmeng/latex",
-                                    "Kotlin Coroutines 1.11.0 — Apache 2.0 — https://github.com/Kotlin/kotlinx.coroutines"
-                                )
-                                noticeLines.forEach { line ->
-                                    Text(
-                                        text = "• $line",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = colors.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
+                    OutlinedButton(
+                        onClick = { showLicensesDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = shapes.large
+                    ) {
+                        Text(stringResource(R.string.settings_btn_licenses))
                     }
                 }
             }
         }
     }
 
+    if (showLicensesDialog) {
+        AlertDialog(
+            onDismissRequest = { showLicensesDialog = false },
+            title = { Text(stringResource(R.string.dialog_licenses_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.dialog_licenses_content,
+                        BuildConfig.VERSION_NAME,
+                        BuildConfig.VERSION_CODE
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showLicensesDialog = false }) { Text(stringResource(R.string.btn_dismiss)) }
+            }
+        )
+    }
 }
