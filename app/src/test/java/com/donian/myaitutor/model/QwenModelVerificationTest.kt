@@ -153,4 +153,34 @@ class QwenModelVerificationTest {
     fun `크기 단독 판정은 크기가 다르면 false다`() {
         assertFalse(QwenModelVerification.isSizeOnlySufficient(true, bytes - 1))
     }
+
+    @Test
+    fun `저장 공간과 가용 메모리가 충분하면 다운로드를 시작할 수 있다`() {
+        assertTrue(
+            QwenModelVerification.canStartDownload(
+                availableStorageBytes = bytes + QwenModelVerification.DOWNLOAD_STORAGE_MARGIN_BYTES,
+                availableMemoryBytes = QwenModelVerification.MIN_DOWNLOAD_AVAIL_BYTES
+            )
+        )
+    }
+
+    @Test
+    fun `여유 공간이 정확히 부족하면 다운로드를 시작할 수 없다`() {
+        assertFalse(
+            QwenModelVerification.canStartDownload(
+                availableStorageBytes = bytes + QwenModelVerification.DOWNLOAD_STORAGE_MARGIN_BYTES - 1,
+                availableMemoryBytes = QwenModelVerification.MIN_DOWNLOAD_AVAIL_BYTES
+            )
+        )
+    }
+
+    @Test
+    fun `가용 메모리가 임계값 미만이면 다운로드를 시작할 수 없다`() {
+        assertFalse(
+            QwenModelVerification.canStartDownload(
+                availableStorageBytes = bytes * 2,
+                availableMemoryBytes = QwenModelVerification.MIN_DOWNLOAD_AVAIL_BYTES - 1
+            )
+        )
+    }
 }

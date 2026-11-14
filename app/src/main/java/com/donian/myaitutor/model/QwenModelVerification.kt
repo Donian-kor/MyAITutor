@@ -71,4 +71,25 @@ object QwenModelVerification {
         fileLength: Long,
         expectedBytes: Long = QwenModelDownloadManager.EXPECTED_MODEL_BYTES
     ): Boolean = fileExists && fileLength == expectedBytes
+
+    /**
+     * 다운로드를 시작할 수 있는지 여부.
+     *
+     * Wi-Fi 연결은 호출부가 확인하며, 여기서는 저장 공간과 가용 메모리를 판정한다.
+     * 모델 파일이 2.6GB 이상이라 여유 공간이 부족하면 중간에 실패하고,
+     * 가용 메모리가 [MIN_DOWNLOAD_AVAIL_BYTES] 미만이면 시스템이 앱을 종료할 수 있어 시작하지 않는다.
+     */
+    fun canStartDownload(
+        availableStorageBytes: Long,
+        availableMemoryBytes: Long,
+        modelBytes: Long = QwenModelDownloadManager.EXPECTED_MODEL_BYTES
+    ): Boolean =
+        availableStorageBytes >= modelBytes + DOWNLOAD_STORAGE_MARGIN_BYTES &&
+            availableMemoryBytes >= MIN_DOWNLOAD_AVAIL_BYTES
+
+    /** 다운로드 시작 시 추가로 확보해야 하는 저장 공간 여유분(bytes). */
+    const val DOWNLOAD_STORAGE_MARGIN_BYTES: Long = 600_000_000L
+
+    /** 다운로드를 시작하기 위해 필요한 최소 가용 메모리(bytes). */
+    const val MIN_DOWNLOAD_AVAIL_BYTES: Long = 3_000_000_000L
 }

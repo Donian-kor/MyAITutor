@@ -196,6 +196,7 @@
     <string name="qwen_dl_msg_not_installed">Qwen3-4B 모델이 설치되지 않았습니다.</string>
     <string name="qwen_dl_msg_downloading">Qwen3-4B-Instruct-2507 모델 다운로드 중</string>
     <string name="qwen_dl_msg_verifying">Qwen3-4B 모델 해시(SHA-256) 무결성 검증 중…</string>
+    <string name="qwen_dl_msg_low_memory">사용 가능한 메모리가 부족해 다운로드를 시작할 수 없습니다. 다른 앱을 종료한 뒤 다시 시도해 주세요.</string>
     <string name="qwen_dl_notification_title">Qwen3 AI 모델 다운로드</string>
     <string name="qwen_dl_notification_desc">Qwen3-4B-Instruct-2507 · 약 2.66GB · Wi-Fi 전용</string>
 

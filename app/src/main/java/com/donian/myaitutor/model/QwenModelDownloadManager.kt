@@ -1,5 +1,6 @@
 package com.donian.myaitutor.model
 
+import android.app.ActivityManager
 import android.app.DownloadManager
 import androidx.core.net.toUri
 import androidx.core.content.edit
@@ -153,9 +154,16 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
     override fun startDownload(): Long {
         val storageDirectory = modelFile.parentFile ?: appContext.filesDir
         val availableBytes = StatFs(storageDirectory.absolutePath).availableBytes
-        val requiredBytes = EXPECTED_MODEL_BYTES + 600_000_000L
-        if (availableBytes < requiredBytes) {
-            throw IOException(appContext.getString(R.string.dl_msg_no_storage))
+        val memoryInfo = ActivityManager.MemoryInfo()
+        (appContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(memoryInfo)
+        // 판정 규칙은 QwenModelVerification(순수 로직)에 두고 여기서는 조회만 담당한다.
+        if (!QwenModelVerification.canStartDownload(availableBytes, memoryInfo.availMem)) {
+            val message = if (availableBytes < EXPECTED_MODEL_BYTES + QwenModelVerification.DOWNLOAD_STORAGE_MARGIN_BYTES) {
+                R.string.dl_msg_no_storage
+            } else {
+                R.string.qwen_dl_msg_low_memory
+            }
+            throw IOException(appContext.getString(message))
         }
 
         val existingId = preferences.getLong(KEY_DOWNLOAD_ID, -1L)
