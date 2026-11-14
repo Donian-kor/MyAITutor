@@ -1,7 +1,10 @@
 package com.donian.myaitutor.ui
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -11,10 +14,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,6 +69,7 @@ fun FocusAiApp(host: HomeViewModelHost) {
 
     var showSettings by remember { mutableStateOf(false) }
     var showCamera by remember { mutableStateOf(false) }
+    var showWifiDownloadWarning by rememberSaveable { mutableStateOf(false) }
     /** 첫 화면(모델 로딩)을 통과했는지 여부. "나중에 하기"도 여기에 반영됩니다. */
     var showMain by rememberSaveable { mutableStateOf(false) }
     var selectedSubject by remember { mutableStateOf("수학") }
@@ -80,6 +86,14 @@ fun FocusAiApp(host: HomeViewModelHost) {
     val modelDownloadAvailable = stringResource(R.string.status_model_download_available)
     var previousRuntimeState by remember { mutableStateOf(uiState.runtimeState) }
     var previousSelectedModel by remember { mutableStateOf(uiState.selectedModel) }
+
+    fun requestModelDownload(model: AppModel) {
+        if (context.isConnectedToWifi()) {
+            viewModel.startModelDownload(model)
+        } else {
+            showWifiDownloadWarning = true
+        }
+    }
 
     // 이전 실행에서 남은 촬영 임시 파일을 정리합니다. (C-02)
     LaunchedEffect(Unit) {
@@ -167,12 +181,12 @@ fun FocusAiApp(host: HomeViewModelHost) {
         ModelLoadingScreen(
             phase = loadingPhase,
             snapshot = uiState.selectedModelSnapshot,
-            onDownload = { viewModel.startSelectedModelDownload() },
+            onDownload = { requestModelDownload(uiState.selectedModel) },
             onRetry = {
                 if (uiState.selectedModelSnapshot.status == ModelDownloadStatus.READY) {
                     viewModel.retryModelWarmup()
                 } else {
-                    viewModel.startSelectedModelDownload()
+                    requestModelDownload(uiState.selectedModel)
                 }
             },
             onSkip = { showMain = true }
@@ -185,7 +199,7 @@ fun FocusAiApp(host: HomeViewModelHost) {
             thinkingMode = uiState.thinkingMode,
             onThinkingModeChange = { viewModel.setThinkingMode(it) },
             onBack = { showSettings = false },
-            onDownload = { viewModel.startModelDownload(uiState.selectedModel) },
+            onDownload = { requestModelDownload(uiState.selectedModel) },
             onDeleteModel = { viewModel.deleteModelFile(uiState.selectedModel) },
             onClearCache = { viewModel.clearCache() },
             selectedModel = uiState.selectedModel,
@@ -193,7 +207,7 @@ fun FocusAiApp(host: HomeViewModelHost) {
             isModelTransitioning = uiState.isModelBusy,
             modelSelectionBlockedReason = uiState.modelSelectionBlockedReason,
             onModelSelected = { viewModel.setSelectedModel(it) },
-            onDownloadModel = { viewModel.startModelDownload(it) },
+            onDownloadModel = ::requestModelDownload,
             onDeleteModelFile = { viewModel.deleteModelFile(it) }
         )
     } else if (showCamera) {
@@ -303,6 +317,28 @@ fun FocusAiApp(host: HomeViewModelHost) {
                     )
                 }
             }
+
         }
     }
+
+    if (showWifiDownloadWarning) {
+        AlertDialog(
+            onDismissRequest = { showWifiDownloadWarning = false },
+            title = { Text(stringResource(R.string.dialog_wifi_download_title)) },
+            text = { Text(stringResource(R.string.dialog_wifi_download_message)) },
+            confirmButton = {
+                TextButton(onClick = { showWifiDownloadWarning = false }) {
+                    Text(stringResource(R.string.btn_confirm))
+                }
+            }
+        )
+    }
+}
+
+private fun Context.isConnectedToWifi(): Boolean {
+    val connectivityManager =
+        getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+    val network = connectivityManager.activeNetwork ?: return false
+    val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+    return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
 }

@@ -39,7 +39,7 @@
     <string name="model_selection_title">나만의 AI쌤을 선택</string>
     <string name="model_download_wifi_notice">Wi-Fi에서 다운로드</string>
     <string name="model_gemma_name">Gemma 4 E4B</string>
-    <string name="model_gemma_desc">멀티모달 · 자유 대화 지원 · 기본 모델</string>
+    <string name="model_gemma_desc">자유 대화 지원 · 학습 모드 지원</string>
     <string name="model_qwen_name">Qwen3-4B-Instruct-2507</string>
     <string name="model_qwen_desc">학습 모드 전용</string>
     <string name="model_qwen_size">다운로드 약 2.66GB</string>
@@ -47,7 +47,9 @@
     <string name="model_single_load_notice">한 번에 하나의 AI 모델만 메모리에 로드됩니다.</string>
     <string name="model_download_section_title">%1$s 다운로드</string>
     <string name="model_download_required_notice">모델 파일을 먼저 내려받아야 이 모델로 전환할 수 있어요.</string>
-    <string name="model_free_chat_blocked_by_qwen">자유 대화는 나만의 AI쌤(Gemma)에서 사용할 수 있어요.</string>
+    <string name="dialog_wifi_download_title">Wi-Fi 연결이 필요해요</string>
+    <string name="dialog_wifi_download_message">AI 모델 다운로드는 Wi-Fi에 연결된 상태에서만 시작할 수 있습니다. Wi-Fi에 연결한 뒤 다시 시도해 주세요.</string>
+    <string name="model_free_chat_blocked_by_qwen">자유 대화는 나만의 AI쌤(Gemma4)에서 사용할 수 있어요.</string>
     <string name="model_selection_blocked_by_free_chat">자유 대화 사용 중에는 Qwen을 선택할 수 없어요. 자유 대화를 끄면 선택할 수 있습니다.</string>
     <string name="model_transitioning_notice">AI 모델을 전환하고 있어요. 잠시만 기다려 주세요.</string>
     <string name="model_transition_loading_title">모델 전환 중</string>
@@ -67,7 +69,7 @@
     <string name="dialog_no_model_fallback_gemma">Gemma로 돌아가기</string>
     <string name="dialog_no_model_later">나중에</string>
     <!-- 추론(Thinking) 모드 -->
-    <string name="settings_thinking_title">Gemma 4 추론 모드</string>
+    <string name="settings_thinking_title">Gemma 4 생각 모드</string>
     <string name="settings_thinking_desc">켜면 답을 내기 전에 스스로 단계를 따져 생각한 뒤 답변합니다. 정확도는 올라가지만 답변이 느려지고 토큰을 더 사용합니다. 학년과 무관하게 직접 켜고 끕니다.</string>
     <string name="settings_current_backend">현재 백엔드: %1$s</string>
     <string name="settings_token_usage">대화 토큰 사용량: %1$d / %2$d 토큰 (출력 제한: %3$d 토큰)</string>
@@ -77,8 +79,8 @@
     <string name="settings_btn_licenses">오픈소스 라이선스 및 버전 정보</string>
     <string name="dialog_licenses_title">오픈소스 라이선스 및 버전 정보</string>
     <string name="dialog_licenses_content">나만의 AI쌤 v%1$s (Build %2$d)\n\n• Jetpack Compose &amp; Material 3 (Apache 2.0)\n• LiteRT-LM Android 0.18.0 (Apache 2.0)\n• CameraX 1.6.2 (Apache 2.0)\n• ONNX Runtime Android 1.21.1 (MIT)\n• OpenCV 4.13.0 (Apache 2.0)\n• Compose LaTeX Renderer 1.7.2 (MIT)\n• Kotlin Coroutines (Apache 2.0)</string>
-    <string name="settings_app_version">나만의 AI쌤 %1$s · Gemma 4 E4B-IT LiteRT-LM</string>
-    <string name="settings_ocr_title">OCR 모델 및 출처</string>
+    <string name="settings_app_version">나만의 AI쌤 v%1$s</string>
+    <string name="settings_ocr_title">나만의 AI쌤 모델 및 출처</string>
     <string name="settings_ocr_details">인식 모델: korean_PP-OCRv5_mobile_rec\n검출 모델: models/det/inference.onnx (세부 모델 ID는 확인되지 않음)\n모델 문서: https://www.paddleocr.ai/latest/version3.x/module_usage/text_recognition.html\nAndroid SDK: https://github.com/PaddlePaddle/PaddleOCR/tree/main/deploy/ppocr-android</string>
 
     <string name="model_status_ready">설치 완료</string>
@@ -98,15 +100,16 @@
     <string name="info_download_title">다운로드 안내</string>
     <string name="info_download_body">모델 파일은 약 3.66GB입니다. 요금이 발생할 수 있으니 반드시 Wi-Fi에서 다운로드하세요. 다운로드가 끝나면 AI 추론은 기기 안에서만 실행됩니다.</string>
     <string name="info_learning_title">나만의 AI쌤 학습 방식</string>
-    <string name="info_learning_body">1. PaddleOCR이 사진 속 글자를 인식합니다.\n2. 인식된 텍스트를 Gemma 4 E4B 온디바이스 AI가 분석해 핵심 해설을 제공합니다.\n3. 답변 끝에 제공되는 맞춤형 추천 질문 칩이나 직접 입력을 통해 이어서 학습할 수 있습니다.</string>
+    <string name="info_learning_body">1. PaddleOCR이 사진 속 글자를 인식합니다.\n2. 인식된 텍스트를 선택된 온디바이스 AI가 분석해 핵심 해설을 제공합니다.\n3. 답변 끝에 제공되는 맞춤형 추천 질문 칩이나 직접 입력을 통해 이어서 학습할 수 있습니다.</string>
     <string name="info_privacy_title">개인정보 오프라인 처리</string>
     <string name="info_privacy_body">문제 촬영과 분석은 모두 기기 안에서 처리되며 외부 서버로 전송되지 않습니다. AI 분석 요청과 추가 질문도 같은 방식으로 처리됩니다. 최초 모델 다운로드 및 업데이트에만 인터넷이 필요합니다.</string>
 
     <string name="dialog_delete_model_title">AI 모델을 삭제할까요?</string>
-    <string name="dialog_delete_model_message">약 3.66GB의 Gemma 모델 파일을 기기에서 삭제합니다. 다시 사용하려면 재다운로드가 필요합니다.</string>
+    <string name="dialog_delete_model_message">약 3.66GB의 Gemma4 모델 파일을 기기에서 삭제합니다. 다시 사용하려면 재다운로드가 필요합니다.</string>
     <string name="dialog_delete_model_message_qwen">약 2.66GB의 Qwen3 모델 파일을 기기에서 삭제합니다. 다시 사용하려면 재다운로드가 필요합니다.</string>
     <string name="btn_delete">삭제</string>
     <string name="btn_cancel">취소</string>
+    <string name="btn_confirm">확인</string>
 
     <!-- 공통 아이콘 설명 -->
     <string name="content_desc_back">뒤로</string>

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +31,8 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.History
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
@@ -207,11 +210,103 @@ internal fun SettingsScreen(
                 enter = fadeIn(animationSpec = tween(500, delayMillis = 300))
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    InfoCard(
-                        icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = colors.primary, modifier = Modifier.size(22.dp)) },
-                        title = stringResource(R.string.settings_ocr_title),
-                        body = stringResource(R.string.settings_ocr_details)
-                    )
+                    var modelInfoExpanded by remember { mutableStateOf(false) }
+                    Card(
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = colors.surface),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { modelInfoExpanded = !modelInfoExpanded }
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(11.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = colors.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        stringResource(R.string.settings_ocr_title),
+                                        fontWeight = FontWeight.SemiBold,
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                    Text(
+                                        if (modelInfoExpanded) "터치하여 접기" else "터치하여 펼치기",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = colors.onSurfaceVariant
+                                    )
+                                }
+                                Icon(
+                                    if (modelInfoExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = null,
+                                    tint = colors.onSurfaceVariant
+                                )
+                            }
+
+                            AnimatedVisibility(visible = modelInfoExpanded) {
+                                Column(
+                                    modifier = Modifier.padding(top = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    HorizontalDivider(color = colors.outlineVariant)
+
+                                    // 1. Gemma 4 E4B-IT
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            "1. Gemma 4 E4B-IT (기본 모델)",
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        Text(
+                                            "• 파일명: gemma-4-E4B-it.litertlm (약 3.66GB)\n• 아키텍처: LiteRT-LM 멀티모달 모델\n• 특징: 과목 문제 풀이 및 자유 대화 모드 지원, 온디바이스 추론",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = colors.onSurfaceVariant
+                                        )
+                                    }
+
+                                    // 2. Qwen3-4B-Instruct-2507
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            "2. Qwen3-4B-Instruct-2507 (추가 모델)",
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        Text(
+                                            "• 파일명: qwen3_4b_instruct_2507_mixed_int4.litertlm (약 2.66GB)\n• 아키텍처: LiteRT-LM 텍스트 모델\n• 특징: 과목 학습 모드 전용 (자유 대화 미지원), typed parts Jinja 템플릿 적용",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = colors.onSurfaceVariant
+                                        )
+                                    }
+
+                                    // 3. OCR 모델
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            "3. OCR 문자 인식 모델",
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        Text(
+                                            "• 인식 모델: korean_PP-OCRv5_mobile_rec\n• 검출 모델: models/det/inference.onnx\n• Android SDK: PaddlePaddle PaddleOCR Android\n• 문서: https://www.paddleocr.ai",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = colors.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     InfoCard(
                         icon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = colors.primary, modifier = Modifier.size(22.dp)) },
                         title = stringResource(R.string.info_learning_title),
