@@ -230,7 +230,8 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
         const val EXPECTED_MODEL_BYTES = 3_659_530_240L
         // 모델 파일의 SHA-256 (소문자 hex). 비어 있으면 해시 검증을 건너뜁니다.
         const val EXPECTED_MODEL_SHA256 = "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0"
-        private const val MIN_MODEL_BYTES = 3_500_000_000L
+        /** 설치된 모델 파일로 인정하는 최소 크기. 엔진 초기화 경로에서도 이 값을 참조한다. */
+    internal const val MIN_MODEL_BYTES = 3_500_000_000L
         private const val PREFS_NAME = "focus_ai_model_manager"
         private const val KEY_DOWNLOAD_ID = "download_id"
         private const val KEY_COMPLETED = "model_completed"

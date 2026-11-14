@@ -313,7 +313,8 @@ class GemmaAssistant(context: Context) : Assistant {
         if (engine != null && conversation != null) return
 
         val modelFile = ModelDownloadManager(appContext).modelFile
-        require(modelFile.isFile && modelFile.length() >= 3_500_000_000L) {
+        // 크기 판정 기준은 다운로드 관리자의 단일 원본(MIN_MODEL_BYTES)을 그대로 사용합니다.
+        require(modelFile.isFile && modelFile.length() >= ModelDownloadManager.MIN_MODEL_BYTES) {
             "Gemma 4 E4B 모델이 설치되지 않았습니다. 설정에서 모델을 다운로드해 주세요."
         }
 
