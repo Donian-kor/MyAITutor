@@ -65,6 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.donian.myaitutor.R
 import com.donian.myaitutor.ai.TutorGrade
+import com.donian.myaitutor.model.AppModel
 import com.donian.myaitutor.tutor.TutorResultScreen
 import com.donian.myaitutor.tutor.TutorUiState
 import com.donian.myaitutor.ui.components.TeacherAvatar
@@ -85,6 +86,7 @@ internal fun HomeScreen(
     onSubjectSelected: (String) -> Unit,
     capturedImage: File?,
     modelReady: Boolean,
+    selectedModel: AppModel,
     onOpenSettings: () -> Unit,
     onOpenCamera: () -> Unit,
     answer: String,
@@ -117,6 +119,13 @@ internal fun HomeScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val colors = MaterialTheme.colorScheme
     val shapes = MaterialTheme.shapes
+    val selectedModelName = stringResource(
+        if (selectedModel == AppModel.QWEN3) {
+            R.string.model_qwen_name
+        } else {
+            R.string.model_gemma_name
+        }
+    )
     var headerVisible by remember { mutableStateOf(false) }
     var subjectDropdownExpanded by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { headerVisible = true }
@@ -195,8 +204,9 @@ internal fun HomeScreen(
                                     analysisStage == ImageAnalysisStage.OCR ->
                                         stringResource(R.string.home_stage_ocr)
                                     analysisStage == ImageAnalysisStage.GEMMA ->
-                                        stringResource(R.string.home_stage_gemma)
-                                    isAnalyzing -> stringResource(R.string.home_stage_gemma)
+                                        stringResource(R.string.home_stage_model, selectedModelName)
+                                    isAnalyzing ->
+                                        stringResource(R.string.home_stage_model, selectedModelName)
                                     else -> stringResource(R.string.home_title_generator)
                                 },
                                 fontWeight = FontWeight.Bold,

@@ -229,6 +229,7 @@ fun FocusAiApp(host: HomeViewModelHost) {
             },
             capturedImage = uiState.capturedImage,
             modelReady = uiState.selectedModelSnapshot.status == ModelDownloadStatus.READY,
+            selectedModel = uiState.selectedModel,
             onOpenSettings = { showSettings = true },
             onOpenCamera = ::openCamera,
             answer = uiState.answer,

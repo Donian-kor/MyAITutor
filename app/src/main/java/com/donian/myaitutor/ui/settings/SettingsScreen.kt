@@ -264,7 +264,7 @@ internal fun SettingsScreen(
                                     // 1. Gemma 4 E4B-IT
                                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                         Text(
-                                            "1. Gemma 4 E4B-IT (기본 모델)",
+                                            "1. Gemma 4 E4B-IT (자유대화+학습 모델)",
                                             fontWeight = FontWeight.Bold,
                                             style = MaterialTheme.typography.bodyMedium
                                         )
@@ -278,7 +278,7 @@ internal fun SettingsScreen(
                                     // 2. Qwen3-4B-Instruct-2507
                                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                         Text(
-                                            "2. Qwen3-4B-Instruct-2507 (추가 모델)",
+                                            "2. Qwen3-4B-Instruct-2507 (학습전용 모델)",
                                             fontWeight = FontWeight.Bold,
                                             style = MaterialTheme.typography.bodyMedium
                                         )
