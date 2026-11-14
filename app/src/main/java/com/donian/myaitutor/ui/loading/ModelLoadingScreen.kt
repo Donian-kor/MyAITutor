@@ -15,19 +15,25 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -123,7 +129,7 @@ fun ModelLoadingScreen(
         1f
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(
@@ -143,7 +149,9 @@ fun ModelLoadingScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = maxHeight)
                 .padding(vertical = 16.dp)
         ) {
             // 선생님 아바타 + 후광 - 개선된 애니메이션
@@ -156,12 +164,14 @@ fun ModelLoadingScreen(
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.scale(avatarScale)
+                    modifier = Modifier
+                        .offset(y = (-5).dp)
+                        .scale(avatarScale)
                 ) {
                     // 외곽 후광 (아이콘 크기에 비례)
                     Box(
                         modifier = Modifier
-                            .size(300.dp)
+                            .size(255.dp)
                             .alpha(haloAlpha * 0.5f)
                             .background(
                                 Brush.radialGradient(
@@ -176,7 +186,7 @@ fun ModelLoadingScreen(
                     // 중간 후광
                     Box(
                         modifier = Modifier
-                            .size(240.dp)
+                            .size(204.dp)
                             .alpha(haloAlpha * 0.8f)
                             .background(
                                 Brush.radialGradient(
@@ -193,13 +203,13 @@ fun ModelLoadingScreen(
                         shape = shapes.extraLarge,
                         color = colors.surface,
                         shadowElevation = 20.dp,
-                        modifier = Modifier.size(190.dp)
+                        modifier = Modifier.size(162.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Image(
                                 painter = painterResource(R.drawable.robot_tutor),
                                 contentDescription = stringResource(R.string.app_name),
-                                modifier = Modifier.size(180.dp)
+                                modifier = Modifier.size(153.dp)
                             )
                         }
                     }
@@ -219,7 +229,9 @@ fun ModelLoadingScreen(
                     shape = shapes.extraLarge,
                     color = colors.surface,
                     shadowElevation = 4.dp,
-                    modifier = Modifier.fillMaxWidth(0.9f)
+                    modifier = Modifier
+                        .widthIn(max = 340.dp)
+                        .wrapContentWidth()
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
