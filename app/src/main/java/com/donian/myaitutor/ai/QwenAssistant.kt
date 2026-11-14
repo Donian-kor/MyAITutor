@@ -36,9 +36,21 @@ class QwenAssistant(context: Context) : Assistant {
     companion object {
         private const val TAG = "QwenAssistant"
         private const val THOUGHT_CHANNEL = "thought"
-        internal const val QWEN_MAX_CONTEXT_TOKENS: Int = 2_048
-        internal const val QWEN_MAX_CONVERSATION_TOKENS: Int = 1_536
-        internal const val QWEN_DEFAULT_OUTPUT_TOKENS: Int = 512
+
+        /**
+         * 컨텍스트 예산.
+         *
+         * Qwen3-4B-Instruct-2507은 네이티브 262,144 컨텍스트를 지원하므로 4,096은 모델 한계가 아닌
+         * 앱이 잡은 예산이다. Gemma와 동일한 값을 써서 출력 512로 답변이 잘리던 문제를 해소했다.
+         * KV 캐시가 2,048 대비 두 배가 되므로 실기기 메모리 검증이 필요하다.
+         */
+        internal const val QWEN_MAX_CONTEXT_TOKENS: Int = 4_096
+
+        /** 대화 전체 토큰 수가 이 값에 도달하면 문맥을 초기화한다. 출력 예약분만 제외한 값이다. */
+        internal const val QWEN_MAX_CONVERSATION_TOKENS: Int = 3_072
+
+        /** 기본 출력 상한. 512로는 풀이 전체를 담지 못해 답변이 중간에 잘렸다. */
+        internal const val QWEN_DEFAULT_OUTPUT_TOKENS: Int = 1_024
         private const val CPU_FALLBACK_MIN_AVAIL_BYTES: Long = 5_368_709_120L
         private const val PEAK_RSS_LIMIT_BYTES: Long = 5_905_580_032L // 5.5GB
     }
