@@ -2,10 +2,19 @@ package com.donian.myaitutor.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -15,13 +24,21 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.donian.myaitutor.R
 import com.donian.myaitutor.camera.CaptureImageAction
 import androidx.compose.runtime.collectAsState
+import com.donian.myaitutor.model.AppModel
 import com.donian.myaitutor.model.ModelDownloadStatus
+import com.donian.myaitutor.model.ModelRuntimeState
 import com.donian.myaitutor.ui.camera.CameraRoute
 import com.donian.myaitutor.ui.home.HomeScreen
 import com.donian.myaitutor.ui.home.HomeViewModel
@@ -61,6 +78,8 @@ fun FocusAiApp(host: HomeViewModelHost) {
     val cameraPermissionDenied = stringResource(R.string.status_camera_permission_denied)
     val cameraPermissionBlocked = stringResource(R.string.status_camera_permission_blocked)
     val modelDownloadAvailable = stringResource(R.string.status_model_download_available)
+    var previousRuntimeState by remember { mutableStateOf(uiState.runtimeState) }
+    var previousSelectedModel by remember { mutableStateOf(uiState.selectedModel) }
 
     // 이전 실행에서 남은 촬영 임시 파일을 정리합니다. (C-02)
     LaunchedEffect(Unit) {
@@ -119,6 +138,29 @@ fun FocusAiApp(host: HomeViewModelHost) {
         }
     }
 
+    LaunchedEffect(uiState.runtimeState, uiState.selectedModel) {
+        val switchCompleted = previousRuntimeState == ModelRuntimeState.TRANSITIONING &&
+            uiState.runtimeState == ModelRuntimeState.ACTIVE &&
+            previousSelectedModel != uiState.selectedModel
+        previousRuntimeState = uiState.runtimeState
+        previousSelectedModel = uiState.selectedModel
+
+        if (switchCompleted) {
+            val modelName = context.getString(
+                if (uiState.selectedModel == AppModel.QWEN3) {
+                    R.string.model_qwen_name
+                } else {
+                    R.string.model_gemma_name
+                }
+            )
+            Toast.makeText(
+                context,
+                context.getString(R.string.model_transition_complete, modelName),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
     val loadingPhase = resolveModelLoadingPhase(uiState.selectedModelSnapshot, uiState.warmup)
 
     if (!showMain) {
@@ -172,7 +214,7 @@ fun FocusAiApp(host: HomeViewModelHost) {
                 }
             },
             capturedImage = uiState.capturedImage,
-            modelReady = uiState.modelSnapshot.status == ModelDownloadStatus.READY,
+            modelReady = uiState.selectedModelSnapshot.status == ModelDownloadStatus.READY,
             onOpenSettings = { showSettings = true },
             onOpenCamera = ::openCamera,
             answer = uiState.answer,
@@ -222,5 +264,45 @@ fun FocusAiApp(host: HomeViewModelHost) {
             onFallbackToGemma = { viewModel.fallbackToGemma() },
             onDismiss = { viewModel.dismissNoModelRecovery() }
         )
+    }
+
+    if (uiState.runtimeState == ModelRuntimeState.TRANSITIONING) {
+        Dialog(
+            onDismissRequest = {},
+            properties = DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false
+            )
+        ) {
+            Surface(
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(
+                        horizontal = 32.dp,
+                        vertical = 28.dp
+                    ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(44.dp),
+                        strokeWidth = 4.dp
+                    )
+                    Text(
+                        text = stringResource(R.string.model_transition_loading_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = stringResource(R.string.model_transition_loading_message),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }

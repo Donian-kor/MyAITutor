@@ -1,6 +1,7 @@
 package com.donian.myaitutor.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ModelDownloadSnapshotTest {
@@ -33,5 +34,11 @@ class ModelDownloadSnapshotTest {
     fun `totalLabel은 0일 때 알 수 없음이다`() {
         val snap = ModelDownloadSnapshot(ModelDownloadStatus.NOT_INSTALLED, 0L, 0L, "")
         assertEquals("알 수 없음", snap.totalLabel)
+    }
+
+    @Test
+    fun `Gemma 다운로드 URL은 파일이 존재하는 고정 리비전을 사용한다`() {
+        assertTrue(ModelDownloadManager.MODEL_DOWNLOAD_URL.contains(ModelDownloadManager.MODEL_REVISION))
+        assertTrue(ModelDownloadManager.MODEL_DOWNLOAD_URL.endsWith("/${ModelDownloadManager.MODEL_FILE_NAME}?download=true"))
     }
 }

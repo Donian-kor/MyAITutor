@@ -64,7 +64,7 @@ internal fun CameraRoute(
             if (image != null) {
                 viewModel.confirmCapture(image)
                 onClose()
-                if (uiState.modelSnapshot.status == ModelDownloadStatus.READY) {
+                if (uiState.selectedModelSnapshot.status == ModelDownloadStatus.READY) {
                     viewModel.analyzeImage(image, selectedSubject, selection)
                 } else {
                     viewModel.setStatusMessage(photoConfirmedNoModel)

@@ -268,6 +268,27 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `Qwen이 준비되어 있으면 Gemma 미설치 상태여도 학습 질문을 보낸다`() = runTest {
+        val engine = FakeGemmaTutorEngine()
+        val (vm, _) = createViewModel(
+            this,
+            engine = engine,
+            ready = false,
+            selectionRepository = FakeSelectionRepository(model = AppModel.QWEN3),
+            qwenModelManager = FakeQwenRepo(ready = true)
+        )
+
+        assertEquals(ModelDownloadStatus.NOT_INSTALLED, vm.state.value.modelSnapshot.status)
+        assertEquals(ModelDownloadStatus.READY, vm.state.value.selectedModelSnapshot.status)
+
+        vm.sendQuestion("분수 계산을 설명해 줘", subject = "수학")
+        advanceUntilIdle()
+
+        assertEquals(1, engine.requests.size)
+        assertEquals("분수 계산을 설명해 줘", engine.requests.single().text)
+    }
+
+    @Test
     fun `analyzeImage는 OCR 텍스트를 요청에 담고 Answer 증가분을 누적한다`() = runTest {
         val engine = FakeGemmaTutorEngine(
             chunkProvider = {

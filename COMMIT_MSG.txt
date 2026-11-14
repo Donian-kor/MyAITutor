@@ -1,8 +1,7 @@
-style: 설정 화면 문구 및 제목 정교화
+docs: README.md 갱신 — Qwen3 모델 추가 및 통합 카운트 반영
 
-- model_selection_title: "나만의 AI쌤을 선택"
-- model_download_wifi_notice: "Wi-Fi에서 다운로드"
-- model_gemma_name: "Gemma 4 E4B"
-- 중복 문구 및 사용하지 않는 정보 카드 정리
-
-단위 테스트 147개 통과 및 실기기 2대(Note10, Fold3) 재설치 완료.
+- Qwen3-4B-Instruct-2507 모델 추가 및 Gemma 4 E4B 지원 명시
+- 단일 메모리 상주 모델 전환 원칙 및 2단계 자동 복구 메커니즘 설명 추가
+- 자유 대화 모드 (Gemma 전용 / Qwen 비활성화 규칙) 안내 추가
+- 통합 AI 모델 선택 및 다운로드 카드 설정 메뉴 구성 순서 갱신
+- 모델 리비전 및 SHA-256 해시 정보 업데이트

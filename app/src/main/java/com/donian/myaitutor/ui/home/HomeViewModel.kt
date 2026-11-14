@@ -818,7 +818,7 @@ class HomeViewModel(
             )
             return
         }
-        if (_state.value.modelSnapshot.status != ModelDownloadStatus.READY) {
+        if (_state.value.selectedModelSnapshot.status != ModelDownloadStatus.READY) {
             _state.value = _state.value.copy(
                 statusMessage = stringProvider.get(R.string.status_model_required)
             )

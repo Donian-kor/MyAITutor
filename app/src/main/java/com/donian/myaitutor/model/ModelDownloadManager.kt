@@ -223,8 +223,9 @@ class ModelDownloadManager(context: Context) : ModelDownloadRepository {
     )
 
     companion object {
+        const val MODEL_REVISION = "f254b5ba6e36f7d89cc7892e268e9877bc20f0a0"
         const val MODEL_DOWNLOAD_URL =
-            "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/23d467f654b9d0b6eb8b1e4f4544d036329007e0/gemma-4-E4B-it.litertlm?download=true"
+            "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/$MODEL_REVISION/gemma-4-E4B-it.litertlm?download=true"
         const val MODEL_FILE_NAME = "gemma-4-E4B-it.litertlm"
         const val EXPECTED_MODEL_BYTES = 3_659_530_240L
         // 모델 파일의 SHA-256 (소문자 hex). 비어 있으면 해시 검증을 건너뜁니다.

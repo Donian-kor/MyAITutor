@@ -41,7 +41,7 @@
     <string name="model_gemma_name">Gemma 4 E4B</string>
     <string name="model_gemma_desc">멀티모달 · 자유 대화 지원 · 기본 모델</string>
     <string name="model_qwen_name">Qwen3-4B-Instruct-2507</string>
-    <string name="model_qwen_desc">학습 모드 전용 · 약 2.66GB</string>
+    <string name="model_qwen_desc">학습 모드 전용</string>
     <string name="model_qwen_size">다운로드 약 2.66GB</string>
     <string name="model_gemma_size">다운로드 약 3.66GB</string>
     <string name="model_single_load_notice">한 번에 하나의 AI 모델만 메모리에 로드됩니다.</string>
@@ -50,6 +50,9 @@
     <string name="model_free_chat_blocked_by_qwen">자유 대화는 나만의 AI쌤(Gemma)에서 사용할 수 있어요.</string>
     <string name="model_selection_blocked_by_free_chat">자유 대화 사용 중에는 Qwen을 선택할 수 없어요. 자유 대화를 끄면 선택할 수 있습니다.</string>
     <string name="model_transitioning_notice">AI 모델을 전환하고 있어요. 잠시만 기다려 주세요.</string>
+    <string name="model_transition_loading_title">모델 전환 중</string>
+    <string name="model_transition_loading_message">새 모델을 준비하고 있어요. 잠시만 기다려 주세요.</string>
+    <string name="model_transition_complete">%1$s 모델로 전환했어요.</string>
     <string name="status_qwen_switch_failed_to_gemma">Qwen 모델을 불러오지 못했습니다. Gemma로 돌아왔습니다.</string>
     <string name="error_model_transition_failed">AI 모델 전환에 실패했습니다. 다시 시도해 주세요.</string>
     <string name="error_no_model_loaded">AI 모델이 로드되지 않았습니다. 설정에서 모델을 선택해 주세요.</string>
