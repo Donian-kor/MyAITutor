@@ -1,6 +1,7 @@
 package com.donian.myaitutor.model
 
 import android.content.Context
+import com.donian.myaitutor.R
 import com.donian.myaitutor.ai.GemmaAssistant
 import com.donian.myaitutor.ai.QwenAssistant
 import com.donian.myaitutor.tutor.LlmInferenceEngine
@@ -171,7 +172,11 @@ class ModelRuntimeCoordinator(
 
     private fun createEngine(model: AppModel): LlmInferenceEngine = when (model) {
         AppModel.GEMMA -> RealGemmaTutorEngine(GemmaAssistant(appContext))
-        AppModel.QWEN3 -> QwenTutorEngine(QwenAssistant(appContext))
+        AppModel.QWEN3 -> QwenTutorEngine(
+            QwenAssistant(appContext),
+            // 컨텍스트 한도 초과 안내는 strings.xml을 단일 원본으로 사용한다.
+            contextOverflowMessage = appContext.getString(R.string.error_context_overflow)
+        )
     }
 
     private data class LoadedEngine(

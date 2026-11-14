@@ -191,7 +191,7 @@ class SwitchableTutorEngineTest {
 
     @Test
     fun `Qwen 활성 상태에서 자유 대화 요청은 QwenTutorEngine에서 차단된다`() = runTest {
-        val engine = QwenTutorEngine(NoopAssistant())
+        val engine = QwenTutorEngine(NoopAssistant(), contextOverflowMessage = "컨텍스트 초과")
         val request = TutorRequest(
             text = "안녕",
             subject = "수학",
