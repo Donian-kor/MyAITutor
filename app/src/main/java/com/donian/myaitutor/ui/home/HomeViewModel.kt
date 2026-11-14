@@ -34,18 +34,21 @@ import com.donian.myaitutor.tutor.inferenceOptionsFor
 import com.donian.myaitutor.ui.settings.AppSettingsRepository
 import com.donian.myaitutor.ui.settings.PrefsAppSettingsRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import java.util.concurrent.Executors
 
 /**
  * 홈 화면의 상태와 비즈니스 로직을 소유합니다.
@@ -62,7 +65,7 @@ class HomeViewModel(
     private val appContext: Context,
     private val modelManager: ModelDownloadRepository = ModelDownloadManager(appContext),
     private val scope: CoroutineScope,
-    private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val enablePolling: Boolean = true,
     private val ocrTextRecognizer: OcrTextRecognizer =
         appContext.applicationContext as OcrTextRecognizer,
@@ -83,7 +86,15 @@ class HomeViewModel(
     /** 모델 전환을 담당하는 조정자. [tutorEngine]이 SwitchableTutorEngine일 때 함께 주입합니다. */
     private val runtimeCoordinator: EngineRuntime? = null,
     /** Qwen 모델 다운로드 상태 조회. Gemma [modelManager]와 완전히 분리됩니다. */
-    private val qwenModelManager: ModelDownloadRepository = QwenModelDownloadManager(appContext)
+    private val qwenModelManager: ModelDownloadRepository = QwenModelDownloadManager(appContext),
+    /**
+     * 종료 시 엔진 해제를 끝까지 보장하는 스코프.
+     * viewModelScope와 분리되어 있어 scope가 이미 취소된 시점의 [close]에서도 동작한다.
+     * 테스트에서는 테스트 스코프를 주입해 해제 완료를 결정적으로 검증한다.
+     */
+    private val shutdownScope: CoroutineScope = CoroutineScope(
+        SupervisorJob() + createShutdownDispatcher()
+    )
 ) {
 
     private companion object {
@@ -94,6 +105,15 @@ class HomeViewModel(
 
         /** 종료 시 엔진 해제를 기다리는 최대 시간. */
         const val ENGINE_RELEASE_WAIT_MS = 3_000L
+
+        /**
+         * 종료 해제 전용 daemon 스레드를 가진 디스패처를 만듭니다.
+         * 호출 스레드(UI 스레드)를 점유하지 않고 JVM 종료도 막지 않습니다.
+         */
+        private fun createShutdownDispatcher(): CoroutineDispatcher =
+            Executors.newSingleThreadExecutor { runnable ->
+                Thread(runnable, "focus-ai-engine-shutdown").apply { isDaemon = true }
+            }.asCoroutineDispatcher()
     }
 
     private val _state = MutableStateFlow(
@@ -174,9 +194,10 @@ class HomeViewModel(
      * [onCleared]와 [MainActivity.onDestroy]에서 모두 호출될 수 있으므로
      * [isClosed]로 한 번만 해제하도록 보장합니다.
      *
-     * 종료 시점에는 viewModelScope가 이미 취소된 상태일 수 있으므로
-     * scope.launch 대신 동기적으로 release()를 끝까지 실행합니다.
-     * 진행 중인 추론이 있으면 짧게 대기한 뒤 엔진을 해제합니다.
+     * 해제는 [shutdownScope]에서 비동기로 마무리합니다. 호출 스레드(주로 UI 스레드)를
+     * 최대 [ENGINE_RELEASE_WAIT_MS] 동안 막지 않아 ANR 위험을 없앴습니다.
+     * [shutdownScope]는 viewModelScope와 분리되어 있어 scope 취소와 무관하게
+     * 해제를 끝까지 보장합니다.
      */
     fun close() {
         if (isClosed) return
@@ -189,7 +210,7 @@ class HomeViewModel(
         generationJob?.cancel()
         generationJob = null
         runCatching {
-            runBlocking {
+            shutdownScope.launch {
                 withTimeoutOrNull(ENGINE_RELEASE_WAIT_MS) {
                     tutorEngine.awaitGenerationStopped(ENGINE_RELEASE_WAIT_MS)
                 }

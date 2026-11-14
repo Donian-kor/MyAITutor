@@ -226,7 +226,9 @@ class HomeViewModelTest {
             tutorEngine = engine,
             appSettings = appSettings,
             selectionRepository = selectionRepository,
-            qwenModelManager = qwenModelManager
+            qwenModelManager = qwenModelManager,
+            // 종료 해제는 테스트 스코프에서 실행해 결정적으로 검증한다.
+            shutdownScope = scope
         )
         return vm to engine
     }
@@ -1122,12 +1124,19 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `close는 엔진을 한 번만 해제한다`() = runTest {
+    fun `close는 UI 스레드를 막지 않고 엔진을 한 번만 해제한다`() = runTest {
         val engine = FakeGemmaTutorEngine()
         val (vm, _) = createViewModel(this, engine = engine)
+
+        // close()는 비동기로 해제를 시작하므로 호출 시점에는 아직 해제되지 않는다.
         vm.close()
-        vm.close()
-        assertEquals(1, engine.releaseCalls)
+        assertEquals(0, engine.releaseCalls)
+
         advanceUntilIdle()
+
+        vm.close()
+        advanceUntilIdle()
+        assertEquals(1, engine.releaseCalls)
+        assertEquals(1, engine.cancelCalls)
     }
 }
