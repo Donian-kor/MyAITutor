@@ -1189,4 +1189,39 @@ class HomeViewModelTest {
 
         assertEquals("엔진 초기화 실패", vm.state.value.transitionFailure)
     }
+
+    @Test
+    fun `복구 실패 후에는 복구 다이얼로그를 요구한다`() = runTest {
+        val failure = ModelTransitionException(
+            target = AppModel.QWEN3,
+            recoveredToPrevious = false,
+            message = "엔진 초기화 실패"
+        )
+        val (vm, _) = createViewModel(this, runtimeCoordinator = FailingCoordinator(failure))
+
+        vm.setSelectedModel(AppModel.QWEN3)
+        advanceUntilIdle()
+        assertTrue(vm.state.value.isNoModelRecoveryRequired)
+
+        // "나중에"를 누르면 다이얼로그를 닫되 모델 없이 계속 사용한다.
+        vm.dismissNoModelRecovery()
+        advanceUntilIdle()
+        assertFalse(vm.state.value.isNoModelRecoveryRequired)
+    }
+
+    @Test
+    fun `자동 복구되면 복구 다이얼로그를 요구하지 않는다`() = runTest {
+        val failure = ModelTransitionException(
+            target = AppModel.QWEN3,
+            recoveredToPrevious = true,
+            message = "이전 모델로 복구"
+        )
+        val (vm, _) = createViewModel(this, runtimeCoordinator = FailingCoordinator(failure))
+
+        vm.setSelectedModel(AppModel.QWEN3)
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value.runtimeState.isUsable)
+        assertFalse(vm.state.value.isNoModelRecoveryRequired)
+    }
 }
