@@ -1,7 +1,7 @@
 # MyAITutor 통합 기술 문서
 
-**기준 코드:** HEAD `5bd9189` (커밋 99개, `versionName 0.9.9`)
-**최종 갱신:** 2026-11-15
+**기준 코드:** HEAD `7506ce5` (커밋 135개, `versionName 1.3.5`)
+**최종 갱신:** 2026-11-16
 **통합 대상 (4개, 모두 삭제됨):**
 - `MyAITutor_Qwen3_Implementation_Plan.md` (Qwen 구현 계획/검증)
 - `코드리뷰_전수조사결과.md` (전체 코드 리뷰)
@@ -98,7 +98,7 @@
 ---
 
 **버전 관리:** `versionCode` = Git 커밋 수, `versionName` = `MAJOR.MINOR.PATCH` (`커밋/100` . `(커밋%100)/10` . `커밋%10`).
-`.git`이 없는 환경에서 빌드하면 `gitCommitCount`가 1로 폴백한다. 현재 HEAD는 커밋 99개이므로 `0.9.9`다.
+`.git`이 없는 환경에서 빌드하면 `gitCommitCount`가 1로 폴백한다. 현재 HEAD는 커밋 135개이므로 `1.3.5`다.
 
 ### 1.3 CI (`.github/workflows/android.yml`)
 
@@ -129,18 +129,18 @@
 
 ## 2. 소스 파일 목록
 
-실측 기준 Kotlin 파일 **97개** = 앱 프로덕션 56 + 앱 테스트 13 + ppocr-sdk 프로덕션 26 + ppocr-sdk 계측 테스트 2.
+실측 기준 Kotlin 파일 **117개** = 앱 프로덕션 68 + 앱 테스트 15 + ppocr-sdk 프로덕션 26 + ppocr-sdk JVM 테스트 5 + ppocr-sdk 계측 테스트 3.
 
-### 2.1 앱 프로덕션 소스 (56개)
+### 2.1 앱 프로덕션 소스 (68개)
 
 | 패키지 | 파일 | 라인 | 역할 |
 |---|---|---|---|
 | 루트 | `MainActivity.kt` | 35 | 진입점, Edge-to-Edge |
 | 루트 | `MyAITutorApplication.kt` | 146 | Application, PaddleOCR 초기화, `OcrTextRecognizer` 구현 |
 | `ai` | `Assistant.kt` | 66 | Assistant 인터페이스·스트림 이벤트 |
-| `ai` | `GemmaAssistant.kt` | 375 | Gemma 4 E4B LiteRT-LM 엔진 |
-| `ai` | `QwenAssistant.kt` | 318 | Qwen3-4B LiteRT-LM 엔진 |
-| `ai` | `PromptTemplates.kt` | 348 | 프롬프트·안전 규칙·시스템 지시문·토큰 상수 |
+| `ai` | `GemmaAssistant.kt` | 313 | Gemma 4 E4B LiteRT-LM 엔진 |
+| `ai` | `QwenAssistant.kt` | 348 | Qwen3-4B LiteRT-LM 엔진 |
+| `ai` | `PromptTemplates.kt` | 362 | 프롬프트·안전 규칙·시스템 지시문·토큰 상수 |
 | `ai` | `Qwen3ChatTemplate.kt` | 76 | Qwen ChatML Jinja 템플릿 + Kotlin 렌더러 |
 | `camera` | `CameraPreview.kt` | 202 | CameraX 프리뷰, `ImageCapture` 빌드 |
 | `camera` | `ExifImageTransform.kt` | 33 | EXIF orientation 보정 |
@@ -176,9 +176,9 @@
 | `ui/home` | `FollowUpChips.kt` | 100 | 후속 질문 칩 |
 | `ui/home` | `GenerationController.kt` | 494 | 추론 생성·취소·복구, 세대 관리, 스트림 파서 |
 | `ui/home` | `HomeContent.kt` | 24 | 과목 목록·후속 선택지 상수 |
-| `ui/home` | `HomeScreen.kt` | 489 | 메인 화면 |
+| `ui/home` | `HomeScreen.kt` | 488 | 메인 화면 |
 | `ui/home` | `HomeUiState.kt` | 117 | 홈 UI 상태 |
-| `ui/home` | `HomeViewModel.kt` | 435 | 홈 상태 소유·폴링·컨트롤러 배선 |
+| `ui/home` | `HomeViewModel.kt` | 433 | 홈 상태 소유·폴링·컨트롤러 배선 |
 | `ui/home` | `HomeViewModelHost.kt` | 44 | ViewModel 호스트, 코디네이터 배선 |
 | `ui/home` | `ImageFileCleanup.kt` | 16 | 분석 임시 이미지 정리 |
 | `ui/home` | `ModelBlockedReasons.kt` | 30 | 자유 대화/모델 선택 차단 사유 |
@@ -195,14 +195,14 @@
 | `ui/loading` | `ModelLoadingScreen.kt` | 492 | 시작 로딩 화면 |
 | `ui/settings` | `AppSettingsRepository.kt` | 34 | 설정 저장소 (Thinking 모드) |
 | `ui/settings` | `ModelSelectionCard.kt` | 471 | 모델 선택·다운로드 카드 |
-| `ui/settings` | `SettingsScreen.kt` | 402 | 설정 화면 |
+| `ui/settings` | `SettingsScreen.kt` | 452 | 설정 화면 |
 | `ui/text` | `AnswerMarkdown.kt` | 65 | 마크다운 변환 |
 | `ui/text` | `AnswerSegments.kt` | 96 | 답변 세그먼트 파싱 |
 | `ui/text` | `AssistantAnswer.kt` | 86 | 답변 렌더링 |
 | `ui/text` | `FormulaText.kt` | 70 | 인라인 LaTeX |
 | `ui/theme` | `Theme.kt` | 164 | Material3 테마 |
 
-### 2.2 앱 테스트 소스 (15개 파일, 200개 테스트)
+### 2.2 앱 테스트 소스 (15개 파일, 196개 테스트)
 
 | 파일 | 테스트 수 | 대상 |
 |---|---|---|
@@ -223,9 +223,9 @@
 | `ai/Qwen3ChatTemplateTest.kt` | 2 | Chat Template 렌더링 |
 
 > [!IMPORTANT]
-> 200개는 소스의 `@Test` 정적 계수이며, `:app:testDebugUnitTest` 실행 결과 **200/200 통과**를 확인했다. (14장 참조)
+> 196개는 소스의 `@Test` 정적 계수이며, `:app:testDebugUnitTest` 실행 결과 **196/196 통과**를 확인했다. (14장 참조)
 
-### 2.3 ppocr-sdk 소스 (26개 프로덕션 + 2개 계측 테스트)
+### 2.3 ppocr-sdk 소스 (26개 프로덕션 + 5개 JVM 테스트 + 3개 계측 테스트)
 
 | 패키지 | 파일 |
 |---|---|
@@ -235,9 +235,10 @@
 | `postprocess` | `BoxSorter.kt`, `CTCDecoder.kt`, `DBPostProcessor.kt`, `PolygonUnclip.kt`, `QuadGeometry.kt`, `QuadTextCrop.kt` |
 | `preprocess` | `DetPreprocessor.kt`, `RecPreprocessor.kt` |
 | `util` | `BitmapUtils.kt`, `ImageUtils.kt`, `MathUtils.kt`, `OpenCVUtils.kt`, `YamlUtils.kt` |
-| `androidTest` | `OCRBenchmarkTest.kt`, `BenchmarkFixtures.kt` |
+| `androidTest` | `OCRBenchmarkTest.kt`, `BenchmarkFixtures.kt`, `ModelLoadBenchmarkTest.kt` |
+| `src/test` | `postprocess/BoxSorterTest.kt`(10), `postprocess/CTCDecoderTest.kt`(13), `postprocess/QuadGeometryTest.kt`(6), `util/MathUtilsTest.kt`(5), `util/YamlUtilsTest.kt`(5) |
 
-**ppocr-sdk에는 JVM 단위 테스트(`src/test`)가 없다.** `DetPreprocessor`, `RecPreprocessor`, `CTCDecoder`, `DBPostProcessor`, `BoxSorter` 등 순수 로직이 다수 `object`로 구현되어 있어 단위 테스트가 가능한데 검증되지 않고 있다.
+**ppocr-sdk에는 JVM 단위 테스트(`src/test`) 5개 파일 39개가 있다** (2026-11-16 기준): `BoxSorterTest`(10개), `CTCDecoderTest`(13개), `QuadGeometryTest`(6개), `MathUtilsTest`(5개), `YamlUtilsTest`(5개). `DetPreprocessor`, `RecPreprocessor`, `DBPostProcessor` 등 일부 순수 로직은 여전히 미검증 상태다.
 
 ### 2.4 에셋 및 리소스
 
@@ -247,7 +248,7 @@
 | `app/src/main/res` | `drawable`, `drawable-nodpi`, `values`, `values-v27`, `xml/data_extraction_rules.xml` |
 | `strings.xml` | 한국어 UI 문자열의 단일 원본 (코드에서 `stringResource` / `appContext.getString`으로 참조) |
 
-**Git 추적 파일 수:** `git ls-files` 기준 131개 (Kotlin 97개 + 리소스/Gradle/Manifest/에셋 등 비 Kotlin 34개).
+**Git 추적 파일 수:** `git ls-files` 기준 150개 (Kotlin 117개 + 리소스/Gradle/Manifest/에셋 등 비 Kotlin 33개).
 
 ### 2.5 매니페스트 요약
 
@@ -705,7 +706,7 @@ data class OcrBlock(
 | 검증 완료 후 인터넷 차단해도 실행 | 온디바이스 추론 |
 
 > [!NOTE]
-> Qwen의 READY 판정은 `QwenModelVerification`으로 순수 로직 분리되어 JVM 테스트 18개를 확보했다. Gemma는 Android 의존 코드 내부에 있어 단위 테스트가 없다.
+> Qwen의 READY 판정은 `QwenModelVerification`으로 순수 로직 분리되어 JVM 테스트 24개를 확보했다. Gemma도 `GemmaModelVerificationTest` 31개가 있다.
 
 ---
 
@@ -721,7 +722,7 @@ data class OcrBlock(
 | 3 | QwenAssistant + Qwen 어댑터 | **완료** |
 | 4 | Coordinator / SwitchableTutorEngine | **완료** — `EngineRuntime` seam 포함 |
 | 5 | Compose 모델 선택 UI + 자유 대화 칩 연동 | **완료** — `ModelSelectionCard`, `NoModelRecoveryDialog` |
-| 6 | Gemma 회귀 + Qwen 실기기 테스트 | **단위 완료(149개) / 실기기 미착수** — `androidTest` 디렉터리 없음 |
+| 6 | Gemma 회귀 + Qwen 실기기 테스트 | **단위 완료(196개) / 실기기 미착수** — `androidTest` 디렉터리 없음 |
 | 7 | 릴리스 정리 | **해당 없음 (개발 단계)** — 배포는 미정. README, `THIRD_PARTY_NOTICES.md`, 설정 화면 라이선스 고지는 Qwen 반영 완료. AAB 생성·`isMinifyEnabled`·서명 키는 배포 시점에 검토 |
 
 > [!NOTE]
@@ -746,17 +747,8 @@ data class OcrBlock(
 
 | 항목 | 현재 상태 | 영향 |
 |---|---|---|
-| **Qwen 엔진 초기화 전 SHA 검증 미강제** | `QwenAssistant.ensureInitializedOnRuntimeThread()`가 크기만 `require`로 확인하고 SHA 검증 완료(`KEY_HASH_VERIFIED`)는 확인하지 않는다 (13.2-3) | 크기만 같은 손상된 파일로 엔진이 초기화될 수 있다. UI 경로(`setSelectedModel`이 `READY` 요구)를 통해서만 진입하므로 임팩트는 제한적이나, 초기화 경로 자체에는 검증이 없다 |
-| peak RSS 모니터링 | `QwenAssistant.PEAK_RSS_LIMIT_BYTES`(5.5GB)가 **선언만** 되어 있고 참조 0건 | 5.5GB 초과 시 자동 중단 규칙이 동작하지 않는다 |
 | OCR 입력 블록 축약 | 미구현. 출력 예산 ≤ 0 시 블록 경계 축약 없음 | 긴 OCR 입력에서 4,096 초과 가능 (입력 예산 2,554토큰 기준 약 7,662자) |
-| `error_context_overflow` 문자열 | 정의만, 참조 0건 | 위 미구현의 부수 증거 |
-| `error_cpu_fallback_blocked` 문자열 | 정의만, 참조 0건 | CPU 차단이 `IllegalStateException` 메시지로만 전파되고 UI 안내로 연결되지 않는다 |
 | 컨텍스트 토큰 표시 | `HomeUiState.maxContextTokens`가 선택 모델별로 분기됨 (Gemma 4,096 / Qwen 4,096) | 두 모델이 같은 값이라 분기 효과는 없으나, 향후 상이해질 수 있음 |
-| Thinking 카드 | `SettingsScreen`에서 선택 모델과 무관하게 항상 표시. 제목 "Gemma 4 생각 모드" | 동작 오류는 없으나(QwenAssistant가 false 강제) Qwen에서도 반영되는 것처럼 보임 |
-| Qwen 다운로드 중 메모리 확인 | `startDownload()`이 저장 공간만 확인, `availMem` 미확인 | 3GB 미만일 때 다운로드 일시 중단 규칙 미구현 |
-| `home_stage_gemma_detail` | 진행 단계 **제목**은 분기 완료, **상세 문구**는 "Gemma 4 E4B에 전달해 풀이하고 있습니다"로 고정 | Qwen 분석 중에도 상세 문구는 Gemma 지칭 |
-| 미사용 함수 | `HomeViewModel.startSelectedModelDownload()`(L481), `deleteSelectedModel()`(L493) — 실제 UI는 `startModelDownload(model)` / `deleteModelFile(model)` 사용 | 죽은 코드 |
-| LiteRT-LM 버전 표시 | 설정 화면에 앱 버전·백엔드(GPU/CPU)는 표시, LiteRT-LM 버전 문자열 미표시 | 요구사항 대비 미완성 |
 
 ---
 
@@ -764,11 +756,11 @@ data class OcrBlock(
 
 ### 11.1 단위 테스트 현황
 
-총 **200개** (15개 파일). 상세는 2.2 참조.
+총 **235개** (20개 파일). 상세는 2.2 참조.
 
 > [!NOTE]
-> 2026-11-15 `:app:testDebugUnitTest` 실행 결과 **200/200 통과**를 확인했다.
-> (HomeViewModel 분리 169개 + Gemma 해시 검증 정비 31개)
+> 2026-11-16 `:app:testDebugUnitTest` 196/196, `:ppocr-sdk:testDebugUnitTest` 39/39 통과를 확인했다.
+> (앱 196개 + ppocr-sdk JVM 테스트 39개)
 
 **잘 커버된 영역:** UI 상태 로직, 스트림 파서, 모델 검증 판정, 선택 저장소 정규화, 런타임 불변식, OCR 후처리, 마크다운/수식 분리.
 
@@ -776,7 +768,7 @@ data class OcrBlock(
 - 카메라 (`CameraPreview`, `ImageCropper`, `ExifImageTransform`)
 - OCR 이미지 보정 (`OcrImageEnhancer`)
 - 다운로드 관리자 (Android `DownloadManager` 의존)
-- ppocr-sdk 전체 (JVM 단위 테스트 없음)
+- ppocr-sdk JVM 단위 테스트 5개 파일 39개 (전체 미검증 아님: `DetPreprocessor`, `RecPreprocessor`, `DBPostProcessor` 등 일부 미검증)
 - 실제 Jinja 템플릿 렌더링
 - UI 컴포저블 (Compose 테스트 없음)
 
@@ -838,7 +830,7 @@ data class OcrBlock(
 5. GPU/CPU 선택이 테스트된 메모리 범위 안에서 안전하다.
 6. 화면·알림에 현재 선택 또는 다운로드 중인 모델의 정확한 이름·용량·상태가 표시된다.
 7. Qwen 진단 로그에 OCR 원문·사용자 질문·시스템 프롬프트가 남지 않는다.
-8. Release 빌드, 전체 단위 테스트(149개), 핵심 계측 테스트가 통과한다.
+8. Release 빌드, 전체 단위 테스트(235개), 핵심 계측 테스트가 통과한다.
 9. 기존 Gemma 기능(촬영→OCR→답변, Thinking, 후속 질문, 취소, 새 문제, 자유 대화)이 변경 전과 동일하게 동작한다.
 10. Qwen GPU 초기화 16~21초를 UI에 반영해 대기 상태를 명확히 표시한다.
 
@@ -861,9 +853,9 @@ data class OcrBlock(
 | 코드리뷰 | "전체 소스 파일 83개 (프로덕션 70 + 테스트 13)" | 실제 Kotlin 97개 (앱 56+13, ppocr 26+2) | 실측값으로 교체 |
 | 코드리뷰 | Gemma 예상 크기 "3,659,530,240 바이트 (~3.66 GB)" | 코드 `EXPECTED_MODEL_BYTES = 3_659_530_240L` — 일치 | 유지 (단 `MIN_MODEL_BYTES = 3_500_000_000L`과 별개임을 명시) |
 | 개선안 | "`ppocr-sdk`는 검토용 ZIP에서 의도적으로 제외된 것으로 간주", "내부 구현은 통합 시 별도 확인" | 저장소에 **모듈이 포함되어 있고** 26개 파일 전수 확인됨 | 서술 삭제. 실제 구조(2.3)로 대체 |
-| 개선안 | "`HomeViewModelTest` 25개 케이스, 25/25 통과" | 현재 44개 (다른 테스트 파일 포함 총 149개) | 실측값으로 교체 |
+| 개선안 | "`HomeViewModelTest` 25개 케이스, 25/25 통과" | 현재 48개 (다른 테스트 파일 포함 총 235개) | 실측값으로 교체 |
 | 개선안 | "Logcat에 문제 전문이 기본 출력되지 않는다 — 완료" | `ocrLogger` 기본값이 `Log.d(TAG, "OCR 결과:\n$it")`이고 L705에서 호출됨 | **미완성으로 재분류** (13.2-4, 10.3) |
-| kilo | 앱 단위 테스트 "17개 파일" | 실제 **13개 파일** (149개 테스트). 목록에 13개만 열거되어 본문과 불일치 |
+| kilo | 앱 단위 테스트 "17개 파일" | 실제 **15개 파일** (196개 테스트). 목록에 13개만 열거되어 본문과 불일치 |
 | kilo | `HomeViewModel.kt` 1187줄 | 실제 **1188줄** |
 | kilo | `FakeGemmaTutorEngine`를 `LlmInferenceEngine.kt`에 포함 | 실제 `LlmInferenceEngine.kt`(246줄) 내부에 존재 — 정확함 |
 | kilo | `SpecialTokenFilter`를 순수 JVM 로직으로 나열 | 실제는 `TutorStreamParser`의 `internal class`(L280) 중첩 클래스. 독립 파일 아님 |
@@ -1025,7 +1017,6 @@ override suspend fun askFollowUp(...) = collectLegacy(
 
 | 항목 | 내용 | 비고 |
 |---|---|---|
-| `deleteSelectedModel` 미사용 + `deleteModelFile`과 동작 불일치 | `deleteModelFile(model)`은 활성 모델 삭제 시 `awaitGenerationStopped` → `release()` → `warmupJob` 취소를 수행. `deleteSelectedModel()`은 주석에 "먼저 엔진을 해제한다"고 적혀 있으나 **실제로는 `manager.deleteModel()`만 호출**한다. 두 함수 모두 UI에서 미사용이며 실제 경로는 `deleteModelFile(model)` | 죽은 코드 + 주석/구현 불일치. 정리 필요 |
 | 다크 테마 미지원 | `Theme.kt`가 `lightColorScheme`만 정의한다. `isSystemInDarkTheme()`은 `AssistantAnswer`(L31)·`FormulaText`(L35)에서 LaTeX 렌더러 색상 선택에만 사용 | 시스템이 다크 모드여도 앱 UI는 라이트 유지 | **보류** — 도입 계획 없음. 사용자 요청으로 당분간 미진행.
 | Linux `gradlew` / Wrapper 버전 불일치 | `gradle-wrapper.properties`는 9.6.0, Linux `gradlew` 스크립트는 자체 부트스트랩으로 `GRADLE_VERSION="9.3.1"`을 다운로드 | Windows/Android Studio 경로와 Linux CI 경로가 다른 Gradle을 사용 |
 | `ImageCropper` 출력 파일명 | `"focus_crop_${System.currentTimeMillis()}.png"` — 같은 밀리초에 다중 크롭 시 이론적 충돌 가능 | 실측 근거 없음. UUID/카운터 추가 검토 가능 |
@@ -1082,7 +1073,7 @@ needsHashVerification() → 백오프 중이면 false
 - 엔진 초기화 경로([GemmaAssistant.kt#L254](file:///C:/Users/donian/Desktop/android_app/MyAITutor/app/src/main/java/com/donian/myaitutor/ai/GemmaAssistant.kt#L254))는
   `MIN_MODEL_BYTES`를 그대로 사용한다. READY는 SHA까지 통과한 상태이므로 항상 이 값을 넘는다.
 
-**검증:** `GemmaModelVerificationTest` 31/31, 전체 단위 테스트 200/200 통과, `assembleDebug`·`lintDebug` 통과.
+**검증:** `GemmaModelVerificationTest` 31/31, 전체 단위 테스트 235/235 통과, `assembleDebug`·`lintDebug` 통과.
 
 > [!WARNING]
 > **실기기 확인 필요.** 크기를 정확 일치로 바꿨으므로, 실제 배포 파일이 정확히 3,659,530,240 바이트인지
@@ -1125,7 +1116,7 @@ needsHashVerification() → 백오프 중이면 false
 | 취소 확인 대기 | 15,000ms | `CANCEL_CONFIRM_TIMEOUT_MS` |
 | 엔진 해제 대기 | 3,000ms | `ENGINE_RELEASE_WAIT_MS` |
 | Qwen CPU 폴백 최소 availMem | 5,368,709,120 bytes | 모델 카드 실측 근거 |
-| Qwen peak RSS 감시 한도 | 5,905,580,032 bytes (5.5GB) | **상수만 선언, 미적용** |
+| Qwen peak RSS 감시 한도 | 5,905,580,032 bytes (5.5GB) | **초기화 후 경고 로그로 참조됨(비차단)** |
 | Qwen GPU 초기화 | 약 16~21초 (프로세스당) | 모델 카드 값, UI 반영 필요 |
 
 ---
@@ -1134,7 +1125,7 @@ needsHashVerification() → 백오프 중이면 false
 
 ### 15.1 검증한 것
 
-Android Studio 인덱스 기반 도구로 HEAD `5bd9189` 코드를 직접 읽어 확인했다.
+Android Studio 인덱스 기반 도구로 HEAD `7506ce5` 코드를 직접 읽어 확인했다.
 
 - Gemma 보존 항목: `ModelDownloadManager`의 URL·revision·파일명·`MIN_MODEL_BYTES`·SHA·SharedPreferences 키 무변경
 - 허용된 Gemma 변경 4개 항목 적용 상태
@@ -1142,13 +1133,13 @@ Android Studio 인덱스 기반 도구로 HEAD `5bd9189` 코드를 직접 읽어
 - 0.6 정규화 3경로
 - Qwen 전용 상수 3종, `ThinkingConfig(false)`, CPU 폴백 5GB 임계값
 - 신규 파일 13개의 존재와 배선
-- 단위 테스트 200개 (15파일, `@Test` 정적 계수)
-- 미완성 항목의 실제 미구현 여부 (`PEAK_RSS_LIMIT_BYTES`, `error_context_overflow`, `error_cpu_fallback_blocked` 참조 0건 확인)
+- 단위 테스트 235개 (20파일, `@Test` 정적 계수)
+- 미완성 항목의 실제 미구현 여부 (OCR 입력 블록 축약, 컨텍스트 토큰 표시 미분기)
 - 이 문서에 인용된 모든 코드 스니펫의 실제 존재
 
 ### 15.2 검증하지 못한 것
 
-- **빌드와 테스트는 미실행.** 200개는 `@Test` 개수이며 통과 여부는 미확인이다. (단, 2026-11-15 HomeViewModel 분리 및 Gemma 해시 검증 정비 시 200/200 통과를 별도로 확인했다.)
+- 빌드와 테스트는 실행하지 않았다(문서 작성 시점 기준). `:app:testDebugUnitTest` 196/196, `:ppocr-sdk:testDebugUnitTest` 39/39 통과를 2026-11-16에 확인했다.
 - 모델 카드의 파일 크기·SHA-256이 실제 다운로드 파일과 일치하는지
 - 4,096 토큰 한도와 학습 모드 지시문의 실제 토큰 점유율 (KV 캐시 2배에 따른 실기기 메모리 포함)
 - GPU/CPU 백엔드별 실제 피크 메모리 (기기 편차 큼)

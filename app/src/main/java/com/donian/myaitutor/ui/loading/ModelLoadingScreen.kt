@@ -315,6 +315,24 @@ fun ModelLoadingScreen(
                     onSkip = onSkip
                 )
             }
+
+            Spacer(Modifier.height(12.dp))
+
+            // 개인정보처리방침 (로그인/모델 준비 전에도 접근 가능)
+            val loadingContext = androidx.compose.ui.platform.LocalContext.current
+            TextButton(onClick = {
+                val intent = android.content.Intent(
+                    android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse(loadingContext.getString(R.string.privacy_policy_url))
+                )
+                loadingContext.startActivity(intent)
+            }) {
+                Text(
+                    stringResource(R.string.settings_privacy_policy),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant
+                )
+            }
         }
     }
 }

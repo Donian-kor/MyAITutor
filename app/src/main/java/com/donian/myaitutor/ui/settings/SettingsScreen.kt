@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.filled.Lightbulb
@@ -316,7 +317,22 @@ internal fun SettingsScreen(
                     InfoCard(
                         icon = { Icon(Icons.Default.History, contentDescription = null, tint = colors.primary, modifier = Modifier.size(22.dp)) },
                         title = stringResource(R.string.info_privacy_title),
-                        body = stringResource(R.string.info_privacy_body)
+                        body = stringResource(R.string.info_privacy_body),
+                        footer = {
+                            val context = androidx.compose.ui.platform.LocalContext.current
+                            val privacyUrl = stringResource(R.string.privacy_policy_url)
+                            TextButton(
+                                onClick = {
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse(privacyUrl)
+                                    )
+                                    context.startActivity(intent)
+                                }
+                            ) {
+                                Text(stringResource(R.string.settings_privacy_policy))
+                            }
+                        }
                     )
                 }
             }
@@ -354,23 +370,30 @@ internal fun SettingsScreen(
                                 .clickable { licensesExpanded = !licensesExpanded }
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(11.dp)
                         ) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = null,
+                                tint = colors.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(R.string.settings_btn_licenses),
+                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    if (licensesExpanded) "터치하여 접기" else "터치하여 펼치기",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.onSurfaceVariant
+                                )
+                            }
                             Icon(
                                 if (licensesExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                                 contentDescription = null,
                                 tint = colors.onSurfaceVariant
-                            )
-                            Text(
-                                stringResource(R.string.settings_btn_licenses),
-                                fontWeight = FontWeight.SemiBold,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Text(
-                                if (licensesExpanded) "접기" else "펼치기",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = colors.onSurfaceVariant
                             )
                         }
                         AnimatedVisibility(visible = licensesExpanded) {
