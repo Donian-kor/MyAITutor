@@ -34,6 +34,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation("androidx.core:core-ktx:1.19.1")
 
+    // 단위 테스트: Android·OpenCV 네이티브 의존성이 없는 순수 Kotlin 로직 전용.
+    // 버전은 :app 모듈과 맞춘다.
+    testImplementation("junit:junit:4.13.2")
+
     androidTestImplementation("androidx.test:runner:1.2.0")
     androidTestImplementation("androidx.test.ext:junit-ktx:1.2.1")
     androidTestImplementation("androidx.test:monitor:1.7.2")
