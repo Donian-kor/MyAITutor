@@ -245,7 +245,11 @@ enum class ModelDownloadStatus {
     PAUSED,
     VERIFYING,
     READY,
-    FAILED
+    FAILED;
+
+    /** 진행 중이거나 잠시 멈춘 상태인지 여부. 화면이 폴링 간격을 정하는 데 사용한다. */
+    fun isTransferring(): Boolean =
+        this == QUEUED || this == DOWNLOADING || this == PAUSED || this == VERIFYING
 }
 
 data class ModelDownloadSnapshot(

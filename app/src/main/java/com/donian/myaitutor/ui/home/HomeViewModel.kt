@@ -13,6 +13,7 @@ import com.donian.myaitutor.model.EngineRuntime
 import com.donian.myaitutor.model.ModelDownloadManager
 import com.donian.myaitutor.model.ModelDownloadRepository
 import com.donian.myaitutor.model.ModelDownloadStatus
+import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelRuntimeState
 import com.donian.myaitutor.model.ModelSelectionRepository
 import com.donian.myaitutor.model.ModelTransitionException
@@ -134,20 +135,25 @@ class HomeViewModel(
                         }
                         modelManager.snapshot()
                     }
-                    val qwenSnapshot = withContext(ioDispatcher) { qwenModelManager.snapshot() }
+                    val qwenSnapshot = withContext(ioDispatcher) {
+                        if (qwenModelManager.needsHashVerification()) {
+                            qwenModelManager.verifyModelHash()
+                        }
+                        qwenModelManager.snapshot()
+                    }
                     val selected = _state.value.selectedModel
                     _state.value = _state.value.copy(
                         modelSnapshot = snapshot,
                         selectedModelSnapshot = if (selected == AppModel.QWEN3) qwenSnapshot else snapshot,
+                        qwenSnapshot = qwenSnapshot,
                         runtimeState = runtimeCoordinator?.status?.value?.state
                             ?: _state.value.runtimeState,
                         freeChatBlockedReason = freeChatBlockedReasonFor(selected),
                         modelSelectionBlockedReason = modelSelectionBlockedReasonFor(selected)
                     )
-                    val busy = snapshot.status == ModelDownloadStatus.DOWNLOADING ||
-                        snapshot.status == ModelDownloadStatus.QUEUED ||
-                        snapshot.status == ModelDownloadStatus.PAUSED ||
-                        snapshot.status == ModelDownloadStatus.VERIFYING
+                    // 두 모델 중 하나라도 전송 중이면 더 자주 갱신한다.
+                    val busy = snapshot.status.isTransferring() ||
+                        qwenSnapshot.status.isTransferring()
                     delay(if (busy) 1_000L else 5_000L)
                 }
             }
@@ -246,6 +252,24 @@ class HomeViewModel(
      */
     fun setSelectedModel(target: AppModel) {
         if (_state.value.selectedModel == target) return
+        // 0.6: 자유 대화 사용 중에는 Qwen 선택을 보류한다.
+        // 안내만 표시하고 전환하지 않으며, 사용자가 자유 대화를 끄면 선택할 수 있다.
+        if (target == AppModel.QWEN3 && _state.value.chatMode) {
+            _state.value = _state.value.copy(
+                modelSelectionBlockedReason = stringProvider.get(
+                    R.string.model_selection_blocked_by_free_chat
+                )
+            )
+            return
+        }
+        // 대상 모델 파일이 준비되지 않았으면 전환하지 않는다 (계획서 4.1 0단계).
+        // 다운로드는 설정 화면의 선택 모델 다운로드 영역에서 진행한다.
+        if (snapshotFor(target).status != ModelDownloadStatus.READY) {
+            _state.value = _state.value.copy(
+                statusMessage = stringProvider.get(R.string.model_download_required_notice)
+            )
+            return
+        }
         if (_state.value.isAnalyzing) {
             tutorEngine.cancelGeneration()
         }
@@ -300,6 +324,157 @@ class HomeViewModel(
             )
         }
     }
+
+    // ---------------------------------------------------------------------
+    // 모델 복구 (계획서 0.4 2단계)
+    // ---------------------------------------------------------------------
+
+    /**
+     * "다시 시도": 마지막으로 선택했던 모델을 다시 로드합니다.
+     *
+     * [setSelectedModel]과 달리 대상 모델이 현재 선택값과 같아도 강제로 재시도한다.
+     */
+    fun retryModelLoad() {
+        val target = _state.value.selectedModel
+        _state.value = _state.value.copy(
+            isNoModelDismissed = false,
+            transitionFailure = null
+        )
+        val coordinator = runtimeCoordinator
+        scope.launch {
+            _state.value = _state.value.copy(runtimeState = ModelRuntimeState.TRANSITIONING)
+            val result = if (coordinator != null) {
+                coordinator.switchTo(target)
+            } else {
+                Result.success(tutorEngine)
+            }
+            result.fold(
+                onSuccess = { _ ->
+                    selectionRepository.setSelectedModel(target)
+                    _state.value = _state.value.copy(
+                        selectedModelSnapshot = snapshotFor(target),
+                        runtimeState = ModelRuntimeState.ACTIVE,
+                        transitionFailure = null,
+                        isNoModelDismissed = false,
+                        freeChatBlockedReason = freeChatBlockedReasonFor(target)
+                    )
+                },
+                onFailure = { error ->
+                    _state.value = _state.value.copy(
+                        runtimeState = ModelRuntimeState.NO_MODEL_LOADED,
+                        transitionFailure = error.message
+                            ?: stringProvider.get(R.string.error_model_transition_failed),
+                        isNoModelDismissed = false
+                    )
+                }
+            )
+        }
+    }
+
+    /**
+     * "Gemma로 돌아가기": Gemma 파일이 유효하면 Gemma를 다시 활성화합니다.
+     *
+     * Gemma 파일도 유효하지 않으면 복구할 수 없으므로 상태 사유만 갱신합니다.
+     */
+    fun fallbackToGemma() {
+        scope.launch {
+            _state.value = _state.value.copy(runtimeState = ModelRuntimeState.TRANSITIONING)
+            val coordinator = runtimeCoordinator
+            if (coordinator == null) {
+                // 조정자가 없는 테스트 경로에서는 선택값만 되돌린다.
+                selectionRepository.setSelectedModel(AppModel.GEMMA)
+                _state.value = _state.value.copy(
+                    selectedModel = AppModel.GEMMA,
+                    selectedModelSnapshot = modelManager.snapshot(),
+                    runtimeState = ModelRuntimeState.ACTIVE,
+                    transitionFailure = null,
+                    isNoModelDismissed = false,
+                    freeChatBlockedReason = null,
+                    modelSelectionBlockedReason = modelSelectionBlockedReasonFor(AppModel.GEMMA)
+                )
+                return@launch
+            }
+
+            if (modelManager.snapshot().status != ModelDownloadStatus.READY) {
+                _state.value = _state.value.copy(
+                    runtimeState = ModelRuntimeState.NO_MODEL_LOADED,
+                    transitionFailure = stringProvider.get(R.string.error_no_model_loaded)
+                )
+                return@launch
+            }
+
+            coordinator.switchTo(AppModel.GEMMA).fold(
+                onSuccess = { _ ->
+                    selectionRepository.setSelectedModel(AppModel.GEMMA)
+                    _state.value = _state.value.copy(
+                        selectedModel = AppModel.GEMMA,
+                        selectedModelSnapshot = modelManager.snapshot(),
+                        runtimeState = ModelRuntimeState.ACTIVE,
+                        transitionFailure = null,
+                        isNoModelDismissed = false,
+                        freeChatBlockedReason = null,
+                        modelSelectionBlockedReason = modelSelectionBlockedReasonFor(AppModel.GEMMA)
+                    )
+                },
+                onFailure = { error ->
+                    _state.value = _state.value.copy(
+                        runtimeState = ModelRuntimeState.NO_MODEL_LOADED,
+                        transitionFailure = error.message
+                            ?: stringProvider.get(R.string.error_no_model_loaded)
+                    )
+                }
+            )
+        }
+    }
+
+    /** "나중에": 모델 없이 앱을 계속 사용합니다(AI 기능 비활성). */
+    fun dismissNoModelRecovery() {
+        _state.value = _state.value.copy(
+            isNoModelDismissed = true,
+            transitionFailure = null
+        )
+    }
+
+    private fun snapshotFor(model: AppModel): ModelDownloadSnapshot =
+        if (model == AppModel.QWEN3) qwenModelManager.snapshot() else modelManager.snapshot()
+
+    /** 지정한 모델의 다운로드를 시작한다. Gemma와 Qwen은 각각 독립 관리된다. */
+    fun startModelDownload(model: AppModel) {
+        val manager = managerFor(model)
+        runCatching { manager.startDownload() }
+            .onSuccess {
+                setStatusMessage(stringProvider.get(R.string.status_download_started))
+                refreshModelSnapshot()
+            }
+            .onFailure { setStatusMessage(stringProvider.get(R.string.status_download_failed)) }
+    }
+
+    /** 지정한 모델의 파일을 삭제한다. 활성 모델이면 먼저 엔진을 해제한다. */
+    fun deleteModelFile(model: AppModel) {
+        val manager = managerFor(model)
+        scope.launch {
+            // 활성 모델을 삭제하는 경우 활성 엔진을 먼저 해제한다.
+            if (_state.value.selectedModel == model) {
+                runCatching {
+                    withContext(ioDispatcher) {
+                        tutorEngine.awaitGenerationStopped(ENGINE_RELEASE_WAIT_MS)
+                        tutorEngine.release()
+                    }
+                }
+                warmupJob?.cancel()
+                warmupJob = null
+            }
+            runCatching {
+                withContext(ioDispatcher) { manager.deleteModel() }
+            }
+            refreshModelSnapshot()
+            setStatusMessage(stringProvider.get(R.string.status_model_deleted))
+        }
+    }
+
+    /** 모델별 다운로드 관리자를 반환한다. */
+    private fun managerFor(model: AppModel): ModelDownloadRepository =
+        if (model == AppModel.QWEN3) qwenModelManager else modelManager
 
     /** 선택 모델의 다운로드를 시작합니다. 선택 모델이 Qwen이면 Qwen 관리자를 사용합니다. */
     fun startSelectedModelDownload() {

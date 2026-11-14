@@ -30,30 +30,79 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
             return File(directory, MODEL_FILE_NAME)
         }
 
+    /** 현재 파일과 저장된 해시 검증 상태로 [QwenModelVerification] 판정을 수행한다. */
+    private fun verifyCurrentFile(
+        completedPreviously: Boolean,
+        hashVerificationRequired: Boolean
+    ): QwenModelVerification.Verdict = QwenModelVerification.decide(
+        completedPreviously = completedPreviously,
+        fileExists = modelFile.isFile,
+        fileLength = if (modelFile.isFile) modelFile.length() else 0L,
+        hashVerified = preferences.getBoolean(KEY_HASH_VERIFIED, false),
+        hashMismatch = preferences.getBoolean(KEY_HASH_MISMATCH, false),
+        hashVerificationRequired = hashVerificationRequired,
+        expectedBytes = EXPECTED_MODEL_BYTES
+    )
+
+    /** 완료된 파일에 대한 스냅샷을 만든다. READY가 아니면 실패 스냅샷으로 변환한다. */
+    private fun completedFileSnapshot(total: Long): ModelDownloadSnapshot =
+        when (verifyCurrentFile(true, EXPECTED_MODEL_SHA256.isNotEmpty())) {
+            QwenModelVerification.Verdict.READY -> ModelDownloadSnapshot(
+                status = ModelDownloadStatus.READY,
+                downloadedBytes = modelFile.length(),
+                totalBytes = total,
+                message = appContext.getString(R.string.dl_msg_ready)
+            )
+
+            QwenModelVerification.Verdict.NEEDS_HASH_VERIFICATION -> ModelDownloadSnapshot(
+                status = ModelDownloadStatus.VERIFYING,
+                downloadedBytes = modelFile.length(),
+                totalBytes = total,
+                message = appContext.getString(R.string.dl_msg_verifying)
+            )
+
+            QwenModelVerification.Verdict.MISMATCH -> failedSnapshot(
+                appContext.getString(R.string.dl_msg_hash_mismatch)
+            )
+
+            QwenModelVerification.Verdict.NOT_INSTALLED -> failedSnapshot(
+                appContext.getString(R.string.dl_msg_size_too_small)
+            )
+        }
+
     override fun snapshot(): ModelDownloadSnapshot {
         val downloadId = preferences.getLong(KEY_DOWNLOAD_ID, -1L)
         val completedPreviously = preferences.getBoolean(KEY_COMPLETED, false)
 
-        if (completedPreviously && modelFile.isFile && modelFile.length() == EXPECTED_MODEL_BYTES) {
-            if (EXPECTED_MODEL_SHA256.isNotEmpty()) {
-                if (preferences.getBoolean(KEY_HASH_MISMATCH, false)) {
-                    return failedSnapshot(appContext.getString(R.string.dl_msg_hash_mismatch))
-                }
-                if (!preferences.getBoolean(KEY_HASH_VERIFIED, false)) {
-                    return ModelDownloadSnapshot(
-                        status = ModelDownloadStatus.VERIFYING,
-                        downloadedBytes = modelFile.length(),
-                        totalBytes = EXPECTED_MODEL_BYTES,
-                        message = appContext.getString(R.string.dl_msg_verifying)
-                    )
-                }
+        // 판정 규칙은 QwenModelVerification(순수 로직)에 두고 여기서는 상태만 매핑한다.
+        if (completedPreviously) {
+            when (
+                verifyCurrentFile(
+                    completedPreviously = true,
+                    hashVerificationRequired = EXPECTED_MODEL_SHA256.isNotEmpty()
+                )
+            ) {
+                QwenModelVerification.Verdict.READY -> return ModelDownloadSnapshot(
+                    status = ModelDownloadStatus.READY,
+                    downloadedBytes = modelFile.length(),
+                    totalBytes = EXPECTED_MODEL_BYTES,
+                    message = appContext.getString(R.string.dl_msg_ready)
+                )
+
+                QwenModelVerification.Verdict.NEEDS_HASH_VERIFICATION -> return ModelDownloadSnapshot(
+                    status = ModelDownloadStatus.VERIFYING,
+                    downloadedBytes = modelFile.length(),
+                    totalBytes = EXPECTED_MODEL_BYTES,
+                    message = appContext.getString(R.string.dl_msg_verifying)
+                )
+
+                QwenModelVerification.Verdict.MISMATCH -> return failedSnapshot(
+                    appContext.getString(R.string.dl_msg_hash_mismatch)
+                )
+
+                // NOT_INSTALLED: 아래 다운로드 기록 조회로 계속 진행한다.
+                QwenModelVerification.Verdict.NOT_INSTALLED -> Unit
             }
-            return ModelDownloadSnapshot(
-                status = ModelDownloadStatus.READY,
-                downloadedBytes = modelFile.length(),
-                totalBytes = EXPECTED_MODEL_BYTES,
-                message = appContext.getString(R.string.dl_msg_ready)
-            )
         }
 
         if (downloadId < 0L) {
@@ -89,30 +138,8 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
                     appContext.getString(R.string.dl_msg_paused)
                 )
                 DownloadManager.STATUS_SUCCESSFUL -> {
-                    if (modelFile.isFile && modelFile.length() == EXPECTED_MODEL_BYTES) {
-                        preferences.edit { putBoolean(KEY_COMPLETED, true) }
-                        if (EXPECTED_MODEL_SHA256.isNotEmpty()) {
-                            if (preferences.getBoolean(KEY_HASH_MISMATCH, false)) {
-                                return failedSnapshot(appContext.getString(R.string.dl_msg_hash_mismatch))
-                            }
-                            if (!preferences.getBoolean(KEY_HASH_VERIFIED, false)) {
-                                return ModelDownloadSnapshot(
-                                    status = ModelDownloadStatus.VERIFYING,
-                                    downloadedBytes = modelFile.length(),
-                                    totalBytes = if (total > 0L) total else EXPECTED_MODEL_BYTES,
-                                    message = appContext.getString(R.string.dl_msg_verifying)
-                                )
-                            }
-                        }
-                        ModelDownloadSnapshot(
-                            ModelDownloadStatus.READY,
-                            modelFile.length(),
-                            if (total > 0L) total else EXPECTED_MODEL_BYTES,
-                            appContext.getString(R.string.dl_msg_ready)
-                        )
-                    } else {
-                        failedSnapshot(appContext.getString(R.string.dl_msg_size_too_small))
-                    }
+                    preferences.edit { putBoolean(KEY_COMPLETED, true) }
+                    completedFileSnapshot(if (total > 0L) total else EXPECTED_MODEL_BYTES)
                 }
                 DownloadManager.STATUS_FAILED -> {
                     val reason = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))

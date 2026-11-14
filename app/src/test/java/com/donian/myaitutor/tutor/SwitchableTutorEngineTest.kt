@@ -30,47 +30,15 @@ import org.junit.Test
  */
 class SwitchableTutorEngineTest {
 
-    /** 위임 호출을 기록하는 최소 어 adaptations. */
-    private class RecordingEngine : LlmInferenceEngine {
-        val events = mutableListOf<String>()
-
-        override fun stream(request: TutorRequest): Flow<TutorStreamChunk> = emptyFlow()
-
-        override fun cancelGeneration() {
-            events += "cancel"
-        }
-
-        override suspend fun awaitGenerationStopped(timeoutMillis: Long): Boolean {
-            events += "awaitStopped"
-            return true
-        }
-
-        override suspend fun resetConversation(systemInstruction: String) {
-            events += "reset"
-        }
-
-        override suspend fun backendLabel(): String = "FAKE"
-
-        override suspend fun getTokenCount(): Int = 0
-
-        override suspend fun preWarm() {
-            events += "preWarm"
-        }
-
-        override suspend fun release() {
-            events += "release"
-        }
-    }
-
-    /** [EngineRuntime] 대역. 활성 엔진과 상태를 제어할 수 있다. */
+    /** 활성 엔진 없이 상태만 관리하는 조정자 대역. */
     private class StubCoordinator(
         private val engine: LlmInferenceEngine?,
         private val active: Boolean = true
     ) : EngineRuntime {
         var ensureActiveCalls = 0
         var releaseActiveCalls = 0
-        var streamCalls = 0
-        private var _status = MutableStateFlow(
+
+        private val _status = MutableStateFlow(
             if (active && engine != null) {
                 RuntimeStatus(
                     state = ModelRuntimeState.ACTIVE,
@@ -86,7 +54,7 @@ class SwitchableTutorEngineTest {
             }
         )
 
-        override val status = _status
+        override val status: MutableStateFlow<RuntimeStatus> = _status
 
         override suspend fun ensureActive(): LlmInferenceEngine {
             ensureActiveCalls++
@@ -101,6 +69,40 @@ class SwitchableTutorEngineTest {
 
         override suspend fun switchTo(target: AppModel): Result<LlmInferenceEngine> =
             Result.failure(UnsupportedOperationException("테스트용"))
+    }
+
+    /** 위임 호출을 기록하는 최소 어댑터. */
+    private class RecordingEngine : LlmInferenceEngine {
+        val events = mutableListOf<String>()
+        var lastSystemInstruction: String? = null
+
+        override fun stream(request: TutorRequest): Flow<TutorStreamChunk> = emptyFlow()
+
+        override fun cancelGeneration() {
+            events += "cancel"
+        }
+
+        override suspend fun awaitGenerationStopped(timeoutMillis: Long): Boolean {
+            events += "awaitStopped"
+            return true
+        }
+
+        override suspend fun resetConversation(systemInstruction: String) {
+            events += "reset"
+            lastSystemInstruction = systemInstruction
+        }
+
+        override suspend fun backendLabel(): String = "FAKE"
+
+        override suspend fun getTokenCount(): Int = 0
+
+        override suspend fun preWarm() {
+            events += "preWarm"
+        }
+
+        override suspend fun release() {
+            events += "release"
+        }
     }
 
     @Test
@@ -188,6 +190,23 @@ class SwitchableTutorEngineTest {
     }
 
     @Test
+    fun `Qwen 활성 상태에서 자유 대화 요청은 QwenTutorEngine에서 차단된다`() = runTest {
+        val engine = QwenTutorEngine(NoopAssistant())
+        val request = TutorRequest(
+            text = "안녕",
+            subject = "수학",
+            grade = TutorGrade.ELEMENTARY,
+            options = inferenceOptionsFor(isFollowUp = false, thinkingEnabled = false),
+            mode = TutorMode.FREE_CHAT
+        )
+
+        val result = runCatching { engine.stream(request).toList() }
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message?.contains("자유 대화") == true)
+    }
+
+    @Test
     fun `RuntimeStatus 기본값은 IDLE이다`() {
         val default = RuntimeStatus()
         assertEquals(ModelRuntimeState.IDLE, default.state)
@@ -210,5 +229,35 @@ class SwitchableTutorEngineTest {
     fun `RuntimeStatus 기본값은 사용 불가 상태다`() {
         val default = RuntimeStatus()
         assertFalse(default.state.isUsable)
+    }
+
+    private class NoopAssistant : Assistant {
+        override fun streamAnswer(request: AssistantRequest): Flow<AssistantStreamEvent> = emptyFlow()
+
+        override suspend fun awaitGenerationStopped(timeoutMillis: Long): Boolean = true
+
+        override suspend fun resetConversation(systemInstruction: String) = Unit
+
+        override suspend fun analyzeImage(
+            ocrText: String,
+            subject: String,
+            onTextChanged: suspend (String) -> Unit
+        ) = Unit
+
+        override suspend fun askFollowUp(
+            question: String,
+            subject: String,
+            onTextChanged: suspend (String) -> Unit
+        ) = Unit
+
+        override suspend fun backendLabel(): String = "NONE"
+
+        override suspend fun getTokenCount(): Int = 0
+
+        override fun cancelGeneration() = Unit
+
+        override suspend fun preWarm() = Unit
+
+        override suspend fun release() = Unit
     }
 }

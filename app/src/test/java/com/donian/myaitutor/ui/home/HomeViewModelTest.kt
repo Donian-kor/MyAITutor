@@ -17,6 +17,7 @@ import com.donian.myaitutor.model.AppModel
 import com.donian.myaitutor.model.ModelDownloadRepository
 import com.donian.myaitutor.model.ModelDownloadSnapshot
 import com.donian.myaitutor.model.ModelDownloadStatus
+import com.donian.myaitutor.model.ModelRuntimeState
 import com.donian.myaitutor.model.ModelSelection
 import com.donian.myaitutor.model.ModelSelectionRepository
 import com.donian.myaitutor.ocr.OcrBlock
@@ -656,6 +657,97 @@ class HomeViewModelTest {
         assertEquals(2, engine.requests.size)
         assertEquals("왜 그런가요?", engine.requests.last().text)
         file.delete()
+    }
+
+    // -----------------------------------------------------------------
+    // 모델 선택 및 0.6 모드 정합
+    // -----------------------------------------------------------------
+
+    @Test
+    fun `Qwen 파일이 없으면 Qwen 선택은 차단되고 안내가 표시된다`() = runTest {
+        val (vm, _) = createViewModel(
+            this,
+            qwenModelManager = FakeQwenRepo(ready = false)
+        )
+
+        vm.setSelectedModel(AppModel.QWEN3)
+        advanceUntilIdle()
+
+        // 전환하지 않고 GEMMA를 유지한다.
+        assertEquals(AppModel.GEMMA, vm.state.value.selectedModel)
+        assertFalse(vm.state.value.statusMessage.isNullOrBlank())
+    }
+
+    @Test
+    fun `Qwen 파일이 준비되면 Qwen으로 전환된다`() = runTest {
+        val selection = FakeSelectionRepository()
+        val (vm, _) = createViewModel(
+            this,
+            selectionRepository = selection,
+            qwenModelManager = FakeQwenRepo(ready = true)
+        )
+
+        vm.setSelectedModel(AppModel.QWEN3)
+        advanceUntilIdle()
+
+        assertEquals(AppModel.QWEN3, vm.state.value.selectedModel)
+        assertEquals(ModelRuntimeState.ACTIVE, vm.state.value.runtimeState)
+    }
+
+    @Test
+    fun `Qwen 활성 상태에서 자유 대화를 켜면 차단된다`() = runTest {
+        val (vm, _) = createViewModel(
+            this,
+            qwenModelManager = FakeQwenRepo(ready = true)
+        )
+        vm.setSelectedModel(AppModel.QWEN3)
+        advanceUntilIdle()
+        assertFalse(vm.state.value.chatMode)
+
+        vm.setChatMode(true)
+        advanceUntilIdle()
+
+        // 차단되어 chatMode는 꺼진 상태로 남는다.
+        assertFalse(vm.state.value.chatMode)
+        assertFalse(vm.state.value.freeChatBlockedReason.isNullOrBlank())
+        assertFalse(vm.state.value.isFreeChatAvailable)
+    }
+
+    @Test
+    fun `자유 대화 사용 중에는 Qwen 선택이 보류된다`() = runTest {
+        val (vm, _) = createViewModel(
+            this,
+            qwenModelManager = FakeQwenRepo(ready = true)
+        )
+        vm.setChatMode(true)
+        advanceUntilIdle()
+        assertTrue(vm.state.value.chatMode)
+
+        vm.setSelectedModel(AppModel.QWEN3)
+        advanceUntilIdle()
+
+        assertFalse(vm.state.value.modelSelectionBlockedReason.isNullOrBlank())
+    }
+
+    @Test
+    fun `저장값이 Qwen과 자유 대화면 정규화하면 자유 대화가 꺼진다`() = runTest {
+        // 어긋난 저장값: QWEN3 + chatMode=true
+        val normalized = ModelSelection(
+            AppModel.QWEN3,
+            chatMode = true
+        ).normalized()
+
+        assertFalse(normalized.chatMode)
+        assertEquals(AppModel.QWEN3, normalized.model)
+        assertTrue(normalized.isConsistent)
+    }
+
+    @Test
+    fun `Gemma 기본값으로 시작하면 자유 대화를 사용할 수 있다`() = runTest {
+        val (vm, _) = createViewModel(this)
+
+        assertTrue(vm.state.value.isFreeChatAvailable)
+        assertEquals(null, vm.state.value.freeChatBlockedReason)
     }
 
     @Test

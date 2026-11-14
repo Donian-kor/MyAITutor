@@ -27,6 +27,7 @@ import com.donian.myaitutor.ui.home.HomeScreen
 import com.donian.myaitutor.ui.home.HomeViewModel
 import com.donian.myaitutor.ui.home.HomeViewModelHost
 import com.donian.myaitutor.ui.home.ModelWarmupState
+import com.donian.myaitutor.ui.home.NoModelRecoveryDialog
 import com.donian.myaitutor.ui.loading.ModelLoadingScreen
 import com.donian.myaitutor.ui.loading.resolveModelLoadingPhase
 import com.donian.myaitutor.ui.settings.SettingsScreen
@@ -136,19 +137,22 @@ fun FocusAiApp(host: HomeViewModelHost) {
         )
     } else if (showSettings) {
         SettingsScreen(
+            // 상단 Gemma 카드는 선택 모델(Gemma/Qwen)의 스냅샷을 그대로 사용한다.
             snapshot = uiState.selectedModelSnapshot,
             backendLabel = uiState.backendLabel,
             thinkingMode = uiState.thinkingMode,
             onThinkingModeChange = { viewModel.setThinkingMode(it) },
             onBack = { showSettings = false },
-            onDownload = { viewModel.startSelectedModelDownload() },
-            onDeleteModel = { viewModel.deleteSelectedModel() },
+            onDownload = { viewModel.startModelDownload(uiState.selectedModel) },
+            onDeleteModel = { viewModel.deleteModelFile(uiState.selectedModel) },
             onClearCache = { viewModel.clearCache() },
             selectedModel = uiState.selectedModel,
-            qwenSnapshot = uiState.selectedModelSnapshot,
+            qwenSnapshot = uiState.qwenSnapshot,
             isModelTransitioning = uiState.isModelBusy,
             modelSelectionBlockedReason = uiState.modelSelectionBlockedReason,
-            onModelSelected = { viewModel.setSelectedModel(it) }
+            onModelSelected = { viewModel.setSelectedModel(it) },
+            onDownloadModel = { viewModel.startModelDownload(it) },
+            onDeleteModelFile = { viewModel.deleteModelFile(it) }
         )
     } else if (showCamera) {
         CameraRoute(
@@ -207,6 +211,16 @@ fun FocusAiApp(host: HomeViewModelHost) {
             onRecoverTutor = { viewModel.recoverTutor() },
             messages = uiState.messages,
             freeChatBlockedReason = uiState.freeChatBlockedReason
+        )
+    }
+
+    // 어떤 모델도 로드되지 않은 경우 복구 선택지를 제공한다 (계획서 0.4 2단계).
+    if (uiState.isNoModelRecoveryRequired) {
+        NoModelRecoveryDialog(
+            failureMessage = uiState.transitionFailure,
+            onRetry = { viewModel.retryModelLoad() },
+            onFallbackToGemma = { viewModel.fallbackToGemma() },
+            onDismiss = { viewModel.dismissNoModelRecovery() }
         )
     }
 }

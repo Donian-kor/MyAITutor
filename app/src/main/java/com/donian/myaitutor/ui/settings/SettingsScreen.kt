@@ -93,14 +93,13 @@ internal fun SettingsScreen(
     qwenSnapshot: ModelDownloadSnapshot = snapshot,
     isModelTransitioning: Boolean = false,
     modelSelectionBlockedReason: String? = null,
-    onModelSelected: (AppModel) -> Unit = {}
+    onModelSelected: (AppModel) -> Unit = {},
+    /** 지정한 모델의 다운로드를 시작한다. Gemma/Qwen 각각 독립적으로 동작한다. */
+    onDownloadModel: (AppModel) -> Unit = { onDownload() },
+    /** 지정한 모델의 파일을 삭제한다. 활성 모델 삭제 시 엔진이 먼저 해제된다. */
+    onDeleteModelFile: (AppModel) -> Unit = { onDeleteModel() }
 ) {
-    var showDeleteDialog by remember { mutableStateOf(false) }
     var showLicensesDialog by remember { mutableStateOf(false) }
-    val isBusy = snapshot.status == ModelDownloadStatus.DOWNLOADING ||
-        snapshot.status == ModelDownloadStatus.QUEUED ||
-        snapshot.status == ModelDownloadStatus.PAUSED ||
-        snapshot.status == ModelDownloadStatus.VERIFYING
     val colors = MaterialTheme.colorScheme
     val shapes = MaterialTheme.shapes
     var visible by remember { mutableStateOf(false) }
@@ -175,238 +174,44 @@ internal fun SettingsScreen(
                 }
             }
 
-            // AI 선생님 모델 카드 - 개선된 디자인
+            // 2) 젬마4와 큐웬 모델 다운로드 및 검증 UI 섹션 카드
             AnimatedVisibility(
                 visible = visible,
                 enter = fadeIn(animationSpec = tween(500, delayMillis = 100))
             ) {
-                Card(
-                    shape = shapes.extraLarge,
-                    colors = CardDefaults.cardColors(containerColor = colors.surface),
-                    border = BorderStroke(1.dp, colors.outlineVariant),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        // 모델 헤더
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                shape = shapes.medium,
-                                color = colors.primaryContainer,
-                                modifier = Modifier.size(56.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Image(
-                                        painter = painterResource(R.drawable.robot_tutor),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Gemma 4 E4B-IT",
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.titleLarge
-                                )
-                                Text(
-                                    stringResource(R.string.settings_engine_desc),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = colors.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        HorizontalDivider(color = colors.outlineVariant)
-
-                        // 모델 상태
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                stringResource(R.string.settings_model_status),
-                                modifier = Modifier.weight(1f),
-                                color = colors.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                when (snapshot.status) {
-                                    ModelDownloadStatus.READY -> stringResource(R.string.model_status_ready)
-                                    ModelDownloadStatus.DOWNLOADING -> stringResource(R.string.model_status_downloading)
-                                    ModelDownloadStatus.QUEUED -> stringResource(R.string.model_status_queued)
-                                    ModelDownloadStatus.PAUSED -> stringResource(R.string.model_status_paused)
-                                    ModelDownloadStatus.VERIFYING -> stringResource(R.string.model_status_verifying)
-                                    ModelDownloadStatus.FAILED -> stringResource(R.string.model_status_failed)
-                                    ModelDownloadStatus.NOT_INSTALLED -> stringResource(R.string.model_status_not_installed)
-                                },
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (snapshot.status == ModelDownloadStatus.READY) colors.tertiary else colors.onSurface
-                            )
-                        }
-
-                        // 상태 메시지
-                        if (snapshot.message.isNotBlank()) {
-                            Text(
-                                snapshot.message,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.onSurfaceVariant
-                            )
-                        }
-
-                        // 진행 표시
-                        if (isBusy || snapshot.status == ModelDownloadStatus.READY) {
-                            LinearProgressIndicator(
-                                progress = { if (snapshot.status == ModelDownloadStatus.READY) 1f else snapshot.progress },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(10.dp)
-                                    .clip(shapes.small),
-                                color = colors.primary,
-                                trackColor = colors.outlineVariant
-                            )
-                            Text(
-                                "${snapshot.downloadedLabel} / ${snapshot.totalLabel}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = colors.onSurfaceVariant
-                            )
-                        }
-
-                        // 액션 버튼
-                        if (snapshot.status == ModelDownloadStatus.READY) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = stringResource(R.string.content_desc_model_installed),
-                                    tint = colors.tertiary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    stringResource(R.string.settings_model_found),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                            OutlinedButton(
-                                onClick = { showDeleteDialog = true },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = shapes.large
-                            ) {
-                                Icon(Icons.Default.DeleteOutline, contentDescription = stringResource(R.string.settings_btn_model_delete), modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(stringResource(R.string.settings_btn_model_delete))
-                            }
-                        } else {
-                            Button(
-                                onClick = onDownload,
-                                enabled = snapshot.status != ModelDownloadStatus.DOWNLOADING,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(52.dp),
-                                shape = shapes.large
-                            ) {
-                                Icon(Icons.Default.CloudDownload, contentDescription = stringResource(R.string.settings_btn_download), modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    when (snapshot.status) {
-                                        ModelDownloadStatus.FAILED -> stringResource(R.string.settings_btn_download_retry)
-                                        ModelDownloadStatus.PAUSED, ModelDownloadStatus.QUEUED -> stringResource(R.string.settings_btn_download_resume)
-                                        else -> stringResource(R.string.settings_btn_download)
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 모델 선택 카드 (Gemma / Qwen). 기존 Gemma 카드를 대체하지 않고 별도 추가한다.
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn(animationSpec = tween(500, delayMillis = 120))
-            ) {
-                ModelSelectionCard(
+                ModelDownloadCard(
+                    gemmaSnapshot = snapshot,
+                    qwenSnapshot = qwenSnapshot,
                     selectedModel = selectedModel,
-                    gemmaStatus = snapshot.status,
-                    qwenStatus = qwenSnapshot.status,
                     isTransitioning = isModelTransitioning,
-                    blockedReason = modelSelectionBlockedReason,
-                    onModelSelected = onModelSelected
+                    onDownload = onDownloadModel,
+                    onDelete = onDeleteModelFile
                 )
             }
 
-            // 추론(Thinking) 모드 설정
+            // 3) AI 모델 선택 및 추론(Thinking) 토글 카드
             AnimatedVisibility(
                 visible = visible,
                 enter = fadeIn(animationSpec = tween(500, delayMillis = 150))
             ) {
-                Surface(
-                    shape = shapes.large,
-                    color = colors.surface,
-                    shadowElevation = 2.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Lightbulb,
-                            contentDescription = null,
-                            tint = colors.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                stringResource(R.string.settings_thinking_title),
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                stringResource(R.string.settings_thinking_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = colors.onSurfaceVariant
-                            )
-                        }
-                        Switch(checked = thinkingMode, onCheckedChange = onThinkingModeChange)
-                    }
+                Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                    ModelSelectionCard(
+                        selectedModel = selectedModel,
+                        gemmaStatus = snapshot.status,
+                        qwenStatus = qwenSnapshot.status,
+                        isTransitioning = isModelTransitioning,
+                        blockedReason = modelSelectionBlockedReason,
+                        onModelSelected = onModelSelected
+                    )
+
+                    ThinkingModeCard(
+                        thinkingMode = thinkingMode,
+                        onThinkingModeChange = onThinkingModeChange
+                    )
                 }
             }
 
-            // 설정 액션 버튼들 - 개선된 간격
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn(animationSpec = tween(500, delayMillis = 200))
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(
-                        onClick = onClearCache,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = shapes.large
-                    ) {
-                        Text(stringResource(R.string.settings_btn_clear_cache))
-                    }
-
-                    OutlinedButton(
-                        onClick = { showLicensesDialog = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = shapes.large
-                    ) {
-                        Text(stringResource(R.string.settings_btn_licenses))
-                    }
-                }
-            }
-
-            // 정보 카드들 - 개선된 간격
+            // 4) 정보 카드들 (기존과 동일)
             AnimatedVisibility(
                 visible = visible,
                 enter = fadeIn(animationSpec = tween(500, delayMillis = 300))
@@ -470,24 +275,30 @@ internal fun SettingsScreen(
                     }
                 }
             }
-        }
-    }
+            // 5) 임시 파일 캐시 정리 / 오픈소스 라이선스 (최하단)
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(animationSpec = tween(500, delayMillis = 500))
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = onClearCache,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = shapes.large
+                    ) {
+                        Text(stringResource(R.string.settings_btn_clear_cache))
+                    }
 
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text(stringResource(R.string.dialog_delete_model_title)) },
-            text = { Text(stringResource(R.string.dialog_delete_model_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDeleteDialog = false
-                    onDeleteModel()
-                }) { Text(stringResource(R.string.btn_delete)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.btn_cancel)) }
+                    OutlinedButton(
+                        onClick = { showLicensesDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = shapes.large
+                    ) {
+                        Text(stringResource(R.string.settings_btn_licenses))
+                    }
+                }
             }
-        )
+        }
     }
 
     if (showLicensesDialog) {

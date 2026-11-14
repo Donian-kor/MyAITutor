@@ -82,7 +82,11 @@ data class HomeUiState(
     /** 자유 대화를 켤 수 없는 이유. null이면 차단 없음(계획서 0.6). */
     val freeChatBlockedReason: String? = null,
     /** Qwen 선택을 보류해야 하는 이유. null이면 선택 가능(계획서 0.6). */
-    val modelSelectionBlockedReason: String? = null
+    val modelSelectionBlockedReason: String? = null,
+    /** 사용자가 복구 다이얼로그를 "나중에"로 닫았는지 여부. */
+    val isNoModelDismissed: Boolean = false,
+    /** Qwen 모델의 다운로드 스냅샷. Gemma [modelSnapshot]과 독립적으로 표시한다. */
+    val qwenSnapshot: ModelDownloadSnapshot = modelSnapshot
 ) {
     /** 전환 중이거나 모델을 사용할 수 없으면 입력을 잠급니다. */
     val isModelBusy: Boolean
@@ -92,4 +96,12 @@ data class HomeUiState(
     /** 자유 대화 칩을 사용할 수 있는지 여부. Qwen 활성 시 false입니다. */
     val isFreeChatAvailable: Boolean
         get() = freeChatBlockedReason == null
+
+    /**
+     * 모델 복구 선택 다이얼로그를 표시해야 하는지 여부(계획서 0.4 2단계).
+     *
+     * 어떤 모델도 로드되지 않은 NO_MODEL_LOADED 상태에서 사용자가 아직 닫지 않은 경우에만 true다.
+     */
+    val isNoModelRecoveryRequired: Boolean
+        get() = runtimeState == ModelRuntimeState.NO_MODEL_LOADED && !isNoModelDismissed
 }
