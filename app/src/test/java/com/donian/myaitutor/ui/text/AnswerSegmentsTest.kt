@@ -1,7 +1,6 @@
 package com.donian.myaitutor.ui.text
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AnswerSegmentsTest {
@@ -61,79 +60,4 @@ class AnswerSegmentsTest {
         assertEquals(0, segments.size)
     }
 
-    @Test
-    fun `SUGGESTIONS 태그가 없으면 본문만 반환하고 추천 목록은 비어있다`() {
-        val parsed = parseAnswerWithSuggestions("이 문제는 피타고라스 정리 문제입니다.")
-        assertEquals("이 문제는 피타고라스 정리 문제입니다.", parsed.mainText)
-        assertTrue(parsed.suggestions.isEmpty())
-    }
-
-    @Test
-    fun `상황에 따라 2개의 추천 질문이 파싱된다`() {
-        val input = """
-            이 문제의 답은 5입니다.
-            
-            [SUGGESTIONS]
-            - 피타고라스 정리 적용 원리가 궁금해요
-            - 비슷 문제 하나 더 풀어볼래요
-        """.trimIndent()
-        val parsed = parseAnswerWithSuggestions(input)
-        assertEquals("이 문제의 답은 5입니다.", parsed.mainText)
-        assertEquals(2, parsed.suggestions.size)
-        assertEquals("피타고라스 정리 적용 원리가 궁금해요", parsed.suggestions[0])
-        assertEquals("비슷 문제 하나 더 풀어볼래요", parsed.suggestions[1])
-    }
-
-    @Test
-    fun `상황에 따라 4개의 추천 질문이 파싱된다`() {
-        val input = """
-            해설입니다.
-            
-            [SUGGESTIONS]
-            - 자세한 유도 과정
-            - 개념 설명
-            - 검산 단계
-            - 공식 암기 팁
-        """.trimIndent()
-        val parsed = parseAnswerWithSuggestions(input)
-        assertEquals("해설입니다.", parsed.mainText)
-        assertEquals(4, parsed.suggestions.size)
-        assertEquals("자세한 유도 과정", parsed.suggestions[0])
-        assertEquals("개념 설명", parsed.suggestions[1])
-        assertEquals("검산 단계", parsed.suggestions[2])
-        assertEquals("공식 암기 팁", parsed.suggestions[3])
-    }
-
-    @Test
-    fun `다중 대화 세션에서 이전 답변의 SUGGESTIONS 태그와 옵션은 본문에서 지워지고 최신 옵션만 파싱된다`() {
-        val input = """
-            첫번째 답변입니다.
-
-            [SUGGESTIONS]
-            - 옛날 질문 1
-            - 옛날 질문 2
-
-            학생: 옛날 질문 1
-
-            AI 답변: 두번째 답변입니다.
-
-            [SUGGESTIONS]
-            - 최신 질문 A
-            - 최신 질문 B
-        """.trimIndent()
-
-        val parsed = parseAnswerWithSuggestions(input)
-        val expectedMainText = """
-            첫번째 답변입니다.
-
-            학생: 옛날 질문 1
-
-            AI 답변: 두번째 답변입니다.
-        """.trimIndent()
-
-        assertEquals(expectedMainText, parsed.mainText)
-        assertEquals(2, parsed.suggestions.size)
-        assertEquals("최신 질문 A", parsed.suggestions[0])
-        assertEquals("최신 질문 B", parsed.suggestions[1])
-    }
 }

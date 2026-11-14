@@ -29,8 +29,7 @@ internal fun AssistantAnswer(text: String, modifier: Modifier = Modifier) {
     )
     val measurer = rememberLatexMeasurer(mathConfig)
     val isDarkTheme = isSystemInDarkTheme()
-    val parsed = remember(text) { parseAnswerWithSuggestions(text) }
-    val segments = remember(parsed.mainText) { parseAnswerSegments(parsed.mainText) }
+    val segments = remember(text) { parseAnswerSegments(text) }
 
     Column(
         modifier = modifier,

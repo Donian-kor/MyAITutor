@@ -174,7 +174,6 @@
 
     <!-- 후속 선택 -->
     <string name="followup_prompt_title">다음에 알고 싶은 내용을 선택하세요</string>
-    <string name="followup_custom_input">직접 입력</string>
     <!-- 모델 다운로드 상태 -->
     <string name="dl_msg_ready">AI 모델 설치 완료</string>
     <string name="dl_msg_not_installed">Gemma 4 E4B 모델이 설치되지 않았습니다.</string>

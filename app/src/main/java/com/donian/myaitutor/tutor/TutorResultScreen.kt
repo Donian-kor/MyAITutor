@@ -69,7 +69,6 @@ import com.donian.myaitutor.ui.home.ChatMessage
 import com.donian.myaitutor.ui.home.ChatRole
 import com.donian.myaitutor.ui.home.FollowUpChips
 import com.donian.myaitutor.ui.text.AssistantAnswer
-import com.donian.myaitutor.ui.text.parseAnswerWithSuggestions
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -143,7 +142,6 @@ internal fun TutorResultScreen(
             Spacer(Modifier.height(4.dp))
         }
 
-        val parsedAnswer = remember(answer) { parseAnswerWithSuggestions(answer) }
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -225,7 +223,6 @@ internal fun TutorResultScreen(
             }
 
             FollowUpChips(
-                suggestions = parsedAnswer.suggestions,
                 visible = showFollowUpChoices &&
                     capturedImageAvailable &&
                     modelReady &&
