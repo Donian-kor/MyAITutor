@@ -1,13 +1,8 @@
-refactor: AI 모델 선택 및 다운로드 섹션카드 통합 및 Qwen 다운로드 문구 수정
+style: 설정 화면 문구 및 제목 정교화
 
-1. AI 모델 다운로드 섹션과 선택 섹션 카드를 하나로 통합 (ModelSelectionCard)
-   - 다운로드 완료된 모델은 선택 라디오/행 클릭 시 바로 활성 모델로 전환
-   - 각 모델별 다운로드 상태, 진행률, 다운로드/삭제 버튼을 통합 카드 내부 항목에 배치
-2. Qwen 모델 다운로드 상태 및 알림 문자열 오류 수정
-   - QwenModelDownloadManager에서 Gemma 전용 문자열 리소스를 참조하여
-     "Gemma 4 E4B 모델 다운로드 중"으로 노출되던 문제 해결
-   - qwen_dl_msg_* 및 qwen_dl_notification_* 문자열을 신규 정의하여
-     실제 다운로드 파일(Qwen3-4B-Instruct-2507, qwen3_4b_instruct_2507_mixed_int4.litertlm)에
-     맞는 정확한 모델명("Qwen3-4B-Instruct-2507 모델 다운로드 중")이 표기되도록 수정
+- model_selection_title: "나만의 AI쌤을 선택"
+- model_download_wifi_notice: "Wi-Fi에서 다운로드"
+- model_gemma_name: "Gemma 4 E4B"
+- 중복 문구 및 사용하지 않는 정보 카드 정리
 
-단위 테스트 146개 전체 통과 및 실기기 렌더링/동작 검증 완료.
+단위 테스트 147개 통과 및 실기기 2대(Note10, Fold3) 재설치 완료.

@@ -36,9 +36,9 @@
 
     <!-- 모델 선택 (Gemma / Qwen) -->
     <string name="model_download_title">AI 모델 다운로드 및 검증</string>
-    <string name="model_selection_title">AI 모델 선택</string>
+    <string name="model_selection_title">나만의 AI쌤을 선택</string>
     <string name="model_download_wifi_notice">Wi-Fi에서 다운로드</string>
-    <string name="model_gemma_name">나만의 AI쌤 (Gemma 4 E4B)</string>
+    <string name="model_gemma_name">Gemma 4 E4B</string>
     <string name="model_gemma_desc">멀티모달 · 자유 대화 지원 · 기본 모델</string>
     <string name="model_qwen_name">Qwen3-4B-Instruct-2507</string>
     <string name="model_qwen_desc">학습 모드 전용 · 약 2.66GB</string>
