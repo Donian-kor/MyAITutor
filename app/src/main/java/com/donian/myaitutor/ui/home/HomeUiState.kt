@@ -2,6 +2,7 @@ package com.donian.myaitutor.ui.home
 
 import com.donian.myaitutor.ai.DEFAULT_MAX_OUTPUT_TOKENS
 import com.donian.myaitutor.ai.MAX_CONTEXT_TOKENS
+import com.donian.myaitutor.ai.QwenAssistant
 import com.donian.myaitutor.ai.TutorGrade
 import com.donian.myaitutor.model.AppModel
 import com.donian.myaitutor.model.ModelDownloadSnapshot
@@ -54,8 +55,6 @@ data class HomeUiState(
     val backendLabel: String = "아직 모델이 실행되지 않았습니다.",
     val showFollowUpChoices: Boolean = false,
     val tokenCount: Int = 0,
-    /** 앱이 사용하는 컨텍스트 예산(토큰). 표시용 단일 원본입니다. */
-    val maxContextTokens: Int = MAX_CONTEXT_TOKENS,
     val maxOutputTokens: Int = DEFAULT_MAX_OUTPUT_TOKENS,
     /** 학년의 단일 원본. 별도 ViewModel/저장소를 만들지 않습니다. */
     val selectedGrade: TutorGrade = TutorGrade.ELEMENTARY,
@@ -96,6 +95,17 @@ data class HomeUiState(
     /** 자유 대화 칩을 사용할 수 있는지 여부. Qwen 활성 시 false입니다. */
     val isFreeChatAvailable: Boolean
         get() = freeChatBlockedReason == null
+
+    /**
+     * 선택 모델의 실제 컨텍스트 예산(토큰). 표시용 단일 원본입니다.
+     *
+     * Gemma는 4,096, Qwen은 2,048이므로 화면 수치가 실제 한도의 2배로 보이지 않게 모델별로 분기합니다.
+     */
+    val maxContextTokens: Int
+        get() = when (selectedModel) {
+            AppModel.GEMMA -> MAX_CONTEXT_TOKENS
+            AppModel.QWEN3 -> QwenAssistant.QWEN_MAX_CONTEXT_TOKENS
+        }
 
     /**
      * 모델 복구 선택 다이얼로그를 표시해야 하는지 여부(계획서 0.4 2단계).

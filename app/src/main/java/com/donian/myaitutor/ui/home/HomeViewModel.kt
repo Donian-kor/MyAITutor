@@ -505,32 +505,6 @@ class HomeViewModel(
     private fun managerFor(model: AppModel): ModelDownloadRepository =
         if (model == AppModel.QWEN3) qwenModelManager else modelManager
 
-    /** 선택 모델의 다운로드를 시작합니다. 선택 모델이 Qwen이면 Qwen 관리자를 사용합니다. */
-    fun startSelectedModelDownload() {
-        val target = _state.value.selectedModel
-        val manager = managerFor(target)
-        runCatching { manager.startDownload() }
-            .onSuccess {
-                setStatusMessage(stringProvider.get(R.string.status_download_started))
-                refreshModelSnapshot()
-            }
-            .onFailure { setStatusMessage(stringProvider.get(R.string.status_download_failed)) }
-    }
-
-    /** 선택 모델의 모델 파일을 삭제합니다. 현재 활성 모델 삭제 시 먼저 엔진을 해제합니다. */
-    fun deleteSelectedModel() {
-        val target = _state.value.selectedModel
-        val manager = if (target == AppModel.QWEN3) qwenModelManager else modelManager
-        scope.launch {
-            // 활성 모델을 삭제하는 경우 활성 엔진을 먼저 해제한다.
-            runCatching {
-                withContext(ioDispatcher) { manager.deleteModel() }
-            }
-            refreshModelSnapshot()
-            setStatusMessage(stringProvider.get(R.string.status_model_deleted))
-        }
-    }
-
     private fun refreshModelSnapshot() {
         val gemmaSnapshot = modelManager.snapshot()
         val qwenSnapshot = qwenModelManager.snapshot()
