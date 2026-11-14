@@ -398,6 +398,14 @@ internal fun SettingsScreen(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = colors.onSurfaceVariant
                                 )
+                                Text(
+                                    stringResource(
+                                        R.string.settings_litertlm_version,
+                                        BuildConfig.LITERTLM_VERSION
+                                    ),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colors.onSurfaceVariant
+                                )
 
                                 HorizontalDivider(color = colors.outlineVariant)
 

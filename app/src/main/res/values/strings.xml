@@ -81,6 +81,7 @@
     <string name="dialog_licenses_title">오픈소스 라이선스 및 버전 정보</string>
     <string name="dialog_licenses_content">나만의 AI쌤 v%1$s (Build %2$d)\n\n• Jetpack Compose &amp; Material 3 (Apache 2.0)\n• LiteRT-LM Android 0.18.0 (Apache 2.0)\n• CameraX 1.6.2 (Apache 2.0)\n• ONNX Runtime Android 1.21.1 (MIT)\n• OpenCV 4.13.0 (Apache 2.0)\n• Compose LaTeX Renderer 1.7.2 (MIT)\n• Kotlin Coroutines (Apache 2.0)</string>
     <string name="settings_app_version">나만의 AI쌤 v%1$s</string>
+    <string name="settings_litertlm_version">LiteRT-LM 런타임 %1$s</string>
     <string name="settings_ocr_title">나만의 AI쌤 모델 및 출처</string>
     <string name="settings_ocr_details">인식 모델: korean_PP-OCRv5_mobile_rec\n검출 모델: models/det/inference.onnx (세부 모델 ID는 확인되지 않음)\n모델 문서: https://www.paddleocr.ai/latest/version3.x/module_usage/text_recognition.html\nAndroid SDK: https://github.com/PaddlePaddle/PaddleOCR/tree/main/deploy/ppocr-android</string>
 

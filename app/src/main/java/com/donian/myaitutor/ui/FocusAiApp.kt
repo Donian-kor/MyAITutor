@@ -152,6 +152,16 @@ fun FocusAiApp(host: HomeViewModelHost) {
         }
     }
 
+    // 모델 전환 완료 토스트 문구. Composable에서 만들어 Configuration 변경에도 stale 값이 남지 않게 한다.
+    val transitionCompleteQwen = stringResource(
+        R.string.model_transition_complete,
+        stringResource(R.string.model_qwen_name)
+    )
+    val transitionCompleteGemma = stringResource(
+        R.string.model_transition_complete,
+        stringResource(R.string.model_gemma_name)
+    )
+
     LaunchedEffect(uiState.runtimeState, uiState.selectedModel) {
         val switchCompleted = previousRuntimeState == ModelRuntimeState.TRANSITIONING &&
             uiState.runtimeState == ModelRuntimeState.ACTIVE &&
@@ -160,16 +170,15 @@ fun FocusAiApp(host: HomeViewModelHost) {
         previousSelectedModel = uiState.selectedModel
 
         if (switchCompleted) {
-            val modelName = context.getString(
-                if (uiState.selectedModel == AppModel.QWEN3) {
-                    R.string.model_qwen_name
-                } else {
-                    R.string.model_gemma_name
-                }
-            )
+            // Composable 범위에서 만든 문구를 사용해 Configuration 변경에도 stale 값이 남지 않게 한다.
+            val message = if (uiState.selectedModel == AppModel.QWEN3) {
+                transitionCompleteQwen
+            } else {
+                transitionCompleteGemma
+            }
             Toast.makeText(
                 context,
-                context.getString(R.string.model_transition_complete, modelName),
+                message,
                 Toast.LENGTH_SHORT
             ).show()
         }

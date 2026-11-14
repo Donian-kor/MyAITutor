@@ -39,6 +39,9 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // LiteRT-LM 런타임 버전. 의존성 선언과 단일 원본으로 맞추고 설정 화면에 노출한다.
+        buildConfigField("String", "LITERTLM_VERSION", "\"0.18.0\"")
+
         // LiteRT-LM 네이티브 라이브러리는 64비트만 제공한다.
         // 32비트 기기에서는 실행 즉시 실패하므로 APK에서 제외해 설치 자체를 막는다.
         ndk {
