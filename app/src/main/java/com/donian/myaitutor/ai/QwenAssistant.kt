@@ -38,18 +38,24 @@ class QwenAssistant(context: Context) : Assistant {
         private const val THOUGHT_CHANNEL = "thought"
 
         /**
-         * 컨텍스트 예산.
+         * 모델 파일 메타데이터가 정한 **대화 입력 토큰 상한**.
          *
-         * Qwen3-4B-Instruct-2507은 네이티브 262,144 컨텍스트를 지원하므로 4,096은 모델 한계가 아닌
-         * 앱이 잡은 예산이다. Gemma와 동일한 값을 써서 출력 512로 답변이 잘리던 문제를 해소했다.
-         * KV 캐시가 2,048 대비 두 배가 되므로 실기기 메모리 검증이 필요하다.
+         * `.litertlm` 파일에 박힌 값으로, `EngineConfig.maxNumTokens`를 올려도 이 값은 바뀌지 않는다.
+         * 실기기 실측: 입력 2,707토큰에서 `FAILED_PRECONDITION (status code 3)`,
+         * "Exceeding the maximum number of tokens allowed: 2707 >= 2048".
+         * 따라서 [QwenContextBudget]의 입력 예산은 이 값을 기준으로 계산해야 한다.
          */
-        internal const val QWEN_MAX_CONTEXT_TOKENS: Int = 4_096
+        internal const val QWEN_MAX_CONTEXT_TOKENS: Int = 2_048
 
         /** 대화 전체 토큰 수가 이 값에 도달하면 문맥을 초기화한다. 출력 예약분만 제외한 값이다. */
-        internal const val QWEN_MAX_CONVERSATION_TOKENS: Int = 3_072
+        internal const val QWEN_MAX_CONVERSATION_TOKENS: Int = 1_024
 
-        /** 기본 출력 상한. 512로는 풀이 전체를 담지 못해 답변이 중간에 잘렸다. */
+        /**
+         * 기본 출력 상한.
+         *
+         * 입력 한도(2,048)와 별개로, 출력은 512로는 풀이가 중간에 잘려 1,024로 올렸다.
+         * 입력 예산은 2,048 − 1,024 − 514(시스템 지시문) − 64(여유) = 446토큰이다.
+         */
         internal const val QWEN_DEFAULT_OUTPUT_TOKENS: Int = 1_024
         private const val CPU_FALLBACK_MIN_AVAIL_BYTES: Long = 5_368_709_120L
         private const val PEAK_RSS_LIMIT_BYTES: Long = 5_905_580_032L // 5.5GB
@@ -147,7 +153,11 @@ class QwenAssistant(context: Context) : Assistant {
             }
         } catch (error: Exception) {
             runCatching {
-                send(AssistantStreamEvent.Error(error.localizedMessage ?: "AI 추론 중 오류가 발생했습니다."))
+                send(
+                    AssistantStreamEvent.Error(
+                        LiteRtErrorMapper.toUserMessage(error.localizedMessage)
+                    )
+                )
             }
         } finally {
             if (activeCompletion === completion) activeCompletion = null
@@ -184,8 +194,14 @@ class QwenAssistant(context: Context) : Assistant {
             }
         }
 
+    /**
+     * Qwen은 학습 전용이므로 최소 학습 지시문을 사용한다.
+     *
+     * 긴 안전 규칙은 앱 진입 단계(과목 선택·자유 대화 차단)에서 이미 걸러지므로
+     * 모델에는 역할만 부여해 입력 예산을 확보한다.
+     */
     @Volatile
-    private var currentSystemInstruction: String = SystemInstruction
+    private var currentSystemInstruction: String = LearningSystemInstruction
 
     private fun resetConversationLocked() {
         runCatching { conversation?.cancelProcess() }
@@ -251,6 +267,11 @@ class QwenAssistant(context: Context) : Assistant {
 
         var lastError: Throwable? = null
         for ((backendName, config) in configs) {
+            Log.i(
+                TAG,
+                "Qwen 엔진 초기화: backend=$backendName, maxNumTokens=${config.maxNumTokens}, " +
+                    "outputToken=$QWEN_DEFAULT_OUTPUT_TOKENS, conversationToken=$QWEN_MAX_CONVERSATION_TOKENS"
+            )
             val candidate = Engine(config)
             var initialized = false
             try {

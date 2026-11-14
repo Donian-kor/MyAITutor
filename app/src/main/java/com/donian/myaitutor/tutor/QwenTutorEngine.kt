@@ -6,12 +6,13 @@ import com.donian.myaitutor.ai.AssistantRequest
 import com.donian.myaitutor.ai.AssistantStreamEvent
 import com.donian.myaitutor.ai.AssistantStreamOptions
 import com.donian.myaitutor.ai.QwenAssistant
+import com.donian.myaitutor.ai.LearningSystemInstruction
+import com.donian.myaitutor.ai.LearningSystemInstruction
 import com.donian.myaitutor.ai.QwenContextBudget
-import com.donian.myaitutor.ai.SystemInstruction
 import com.donian.myaitutor.ai.TutorGrade
 import com.donian.myaitutor.ai.analyzeImagePrompt
 import com.donian.myaitutor.ai.followUpPrompt
-import com.donian.myaitutor.ai.standaloneQuestionPrompt
+import com.donian.myaitutor.ai.qwenStandaloneQuestionPrompt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -34,7 +35,7 @@ class QwenTutorEngine(
             request.options.isFollowUp && !request.isStandaloneQuestion ->
                 listOf(followUpPrompt(request.text, request.subject, request.grade))
             request.isStandaloneQuestion ->
-                listOf(standaloneQuestionPrompt(request.text, request.subject, request.grade))
+                listOf(qwenStandaloneQuestionPrompt(request.text, request.subject, request.grade))
             else -> listOf(
                 "[OCR 인식 텍스트]\n${request.text}",
                 analyzeImagePrompt(request.subject, request.grade)
@@ -43,11 +44,12 @@ class QwenTutorEngine(
 
         val maxOutputTokens = request.options.maxOutputTokens
             .coerceAtMost(QwenAssistant.QWEN_DEFAULT_OUTPUT_TOKENS)
-        // 시스템 지시문은 Conversation이 이미 보유하므로 입력 예산에서 먼저 예약한다.
+        // 입력 예산은 모델 메타데이터가 정한 대화 입력 한도(2,048)를 넘을 수 없다.
+        // 시스템 지시문은 Conversation이 이미 보유하므로 여기서 먼저 예약한다.
         val inputBudget = QwenContextBudget.inputBudgetTokens(
             contextTokens = QwenAssistant.QWEN_MAX_CONTEXT_TOKENS,
             outputTokens = maxOutputTokens,
-            systemInstructionTokens = QwenContextBudget.estimateTokens(SystemInstruction)
+            systemInstructionTokens = QwenContextBudget.estimateTokens(LearningSystemInstruction)
         )
         val budget = QwenContextBudget.fit(promptParts, inputBudget)
         if (budget.overflow) {
