@@ -92,4 +92,17 @@ object QwenModelVerification {
 
     /** 다운로드를 시작하기 위해 필요한 최소 가용 메모리(bytes). */
     const val MIN_DOWNLOAD_AVAIL_BYTES: Long = 3_000_000_000L
+
+    /**
+     * 저장된 해시 검증 결과가 지금 파일에 대한 것인지 판정한다.
+     *
+     * 검증 당시의 크기·수정시각이 현재 파일과 다르면 다른 파일이 같은 경로에 놓인 것이므로
+     * 이전 검증 결과를 재사용하지 않는다.
+     */
+    fun isHashCacheForFile(
+        cachedLength: Long,
+        cachedLastModified: Long,
+        fileLength: Long,
+        fileLastModified: Long
+    ): Boolean = cachedLength == fileLength && cachedLastModified == fileLastModified
 }

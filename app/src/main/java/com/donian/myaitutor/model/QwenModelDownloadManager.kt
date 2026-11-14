@@ -31,19 +31,39 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
             return File(directory, MODEL_FILE_NAME)
         }
 
+    /**
+     * 저장된 해시 검증 결과가 지금 파일을 가리키는지 확인한다.
+     *
+     * 검증 당시의 크기·수정시각을 함께 저장해, 다른 파일이 같은 경로에 놓이면
+     * 이전 검증 결과를 재사용하지 않고 다시 검증하도록 한다.
+     */
+    private fun isHashCacheForCurrentFile(): Boolean {
+        val file = modelFile
+        if (!file.isFile) return false
+        return QwenModelVerification.isHashCacheForFile(
+            cachedLength = preferences.getLong(KEY_HASH_LENGTH, -1L),
+            cachedLastModified = preferences.getLong(KEY_HASH_LAST_MODIFIED, -1L),
+            fileLength = file.length(),
+            fileLastModified = file.lastModified()
+        )
+    }
+
     /** 현재 파일과 저장된 해시 검증 상태로 [QwenModelVerification] 판정을 수행한다. */
     private fun verifyCurrentFile(
         completedPreviously: Boolean,
         hashVerificationRequired: Boolean
-    ): QwenModelVerification.Verdict = QwenModelVerification.decide(
-        completedPreviously = completedPreviously,
-        fileExists = modelFile.isFile,
-        fileLength = if (modelFile.isFile) modelFile.length() else 0L,
-        hashVerified = preferences.getBoolean(KEY_HASH_VERIFIED, false),
-        hashMismatch = preferences.getBoolean(KEY_HASH_MISMATCH, false),
-        hashVerificationRequired = hashVerificationRequired,
-        expectedBytes = EXPECTED_MODEL_BYTES
-    )
+    ): QwenModelVerification.Verdict {
+        val cacheValid = isHashCacheForCurrentFile()
+        return QwenModelVerification.decide(
+            completedPreviously = completedPreviously,
+            fileExists = modelFile.isFile,
+            fileLength = if (modelFile.isFile) modelFile.length() else 0L,
+            hashVerified = cacheValid && preferences.getBoolean(KEY_HASH_VERIFIED, false),
+            hashMismatch = cacheValid && preferences.getBoolean(KEY_HASH_MISMATCH, false),
+            hashVerificationRequired = hashVerificationRequired,
+            expectedBytes = EXPECTED_MODEL_BYTES
+        )
+    }
 
     /** 완료된 파일에 대한 스냅샷을 만든다. READY가 아니면 실패 스냅샷으로 변환한다. */
     private fun completedFileSnapshot(total: Long): ModelDownloadSnapshot =
@@ -175,6 +195,9 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
             putBoolean(KEY_COMPLETED, false)
             putBoolean(KEY_HASH_VERIFIED, false)
             putBoolean(KEY_HASH_MISMATCH, false)
+            // 새 다운로드는 처음부터 검증해야 하므로 이전 파일 지문을 지운다.
+            remove(KEY_HASH_LENGTH)
+            remove(KEY_HASH_LAST_MODIFIED)
         }
 
         val request = DownloadManager.Request(MODEL_DOWNLOAD_URL.toUri())
@@ -204,6 +227,8 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
             putBoolean(KEY_COMPLETED, false)
             putBoolean(KEY_HASH_VERIFIED, false)
             putBoolean(KEY_HASH_MISMATCH, false)
+            remove(KEY_HASH_LENGTH)
+            remove(KEY_HASH_LAST_MODIFIED)
         }
     }
 
@@ -218,6 +243,7 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
     fun isFileVerified(): Boolean =
         modelFile.isFile &&
             modelFile.length() == EXPECTED_MODEL_BYTES &&
+            isHashCacheForCurrentFile() &&
             !preferences.getBoolean(KEY_HASH_MISMATCH, false) &&
             preferences.getBoolean(KEY_HASH_VERIFIED, false)
 
@@ -225,8 +251,11 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
         if (EXPECTED_MODEL_SHA256.isEmpty()) return false
         if (!modelFile.isFile || modelFile.length() != EXPECTED_MODEL_BYTES) return false
         if (!preferences.getBoolean(KEY_COMPLETED, false)) return false
-        if (preferences.getBoolean(KEY_HASH_VERIFIED, false)) return false
-        if (preferences.getBoolean(KEY_HASH_MISMATCH, false)) return false
+        // 파일이 바뀌었으면 이전 검증 결과는 무효이며 다시 검증해야 한다.
+        if (isHashCacheForCurrentFile()) {
+            if (preferences.getBoolean(KEY_HASH_VERIFIED, false)) return false
+            if (preferences.getBoolean(KEY_HASH_MISMATCH, false)) return false
+        }
         return true
     }
 
@@ -247,6 +276,9 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
             preferences.edit {
                 putBoolean(KEY_HASH_VERIFIED, match)
                 putBoolean(KEY_HASH_MISMATCH, !match)
+                // 검증 대상 파일의 지문을 함께 기록해 다른 파일의 결과를 재사용하지 않는다.
+                putLong(KEY_HASH_LENGTH, modelFile.length())
+                putLong(KEY_HASH_LAST_MODIFIED, modelFile.lastModified())
             }
             match
         } catch (e: Exception) {
@@ -273,5 +305,9 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
         private const val KEY_COMPLETED = "model_completed"
         private const val KEY_HASH_VERIFIED = "model_hash_verified"
         private const val KEY_HASH_MISMATCH = "model_hash_mismatch"
+        /** 검증 당시 파일 크기. 파일 교체 감지용입니다. */
+        private const val KEY_HASH_LENGTH = "model_hash_length"
+        /** 검증 당시 파일 수정시각. 파일 교체 감지용입니다. */
+        private const val KEY_HASH_LAST_MODIFIED = "model_hash_last_modified"
     }
 }

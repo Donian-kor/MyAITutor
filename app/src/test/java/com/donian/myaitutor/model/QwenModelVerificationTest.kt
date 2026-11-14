@@ -183,4 +183,19 @@ class QwenModelVerificationTest {
             )
         )
     }
+
+    @Test
+    fun `검증 캐시는 크기와 수정시각이 모두 같을 때만 유효하다`() {
+        assertTrue(QwenModelVerification.isHashCacheForFile(1_000L, 2_000L, 1_000L, 2_000L))
+    }
+
+    @Test
+    fun `크기가 같은 다른 파일이면 검증 캐시를 무효로 본다`() {
+        assertFalse(QwenModelVerification.isHashCacheForFile(1_000L, 2_000L, 1_000L, 9_999L))
+    }
+
+    @Test
+    fun `수정시각이 같아도 크기가 다르면 검증 캐시를 무효로 본다`() {
+        assertFalse(QwenModelVerification.isHashCacheForFile(1_000L, 2_000L, 999L, 2_000L))
+    }
 }
