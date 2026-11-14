@@ -33,8 +33,13 @@ import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.toList
+import com.donian.myaitutor.ai.CpuFallbackBlockedException
+import com.donian.myaitutor.model.EngineRuntime
+import com.donian.myaitutor.model.ModelTransitionException
+import com.donian.myaitutor.model.RuntimeStatus
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -195,7 +200,8 @@ class HomeViewModelTest {
         appSettings: AppSettingsRepository = FakeAppSettings(),
         stringProvider: StringProvider = StringProvider { _, _ -> "테스트" },
         selectionRepository: ModelSelectionRepository = FakeSelectionRepository(),
-        qwenModelManager: ModelDownloadRepository = FakeQwenRepo()
+        qwenModelManager: ModelDownloadRepository = FakeQwenRepo(),
+        runtimeCoordinator: EngineRuntime? = null
     ): Pair<HomeViewModel, FakeGemmaTutorEngine> {
         val vm = HomeViewModel(
             app,
@@ -209,6 +215,7 @@ class HomeViewModelTest {
             appSettings = appSettings,
             selectionRepository = selectionRepository,
             qwenModelManager = qwenModelManager,
+            runtimeCoordinator = runtimeCoordinator,
             // 종료 해제는 테스트 스코프에서 실행해 결정적으로 검증한다.
             shutdownScope = scope
         )
@@ -1120,5 +1127,66 @@ class HomeViewModelTest {
         advanceUntilIdle()
         assertEquals(1, engine.releaseCalls)
         assertEquals(1, engine.cancelCalls)
+    }
+    /** [cause]로 CPU 폴백 차단을 감싼 조정자 대역. 모델 전환 실패 경로를 검증한다. */
+    private class FailingCoordinator(
+        private val failure: Throwable
+    ) : EngineRuntime {
+        override val status: MutableStateFlow<RuntimeStatus> =
+            MutableStateFlow(RuntimeStatus())
+
+        override suspend fun ensureActive(): com.donian.myaitutor.tutor.LlmInferenceEngine =
+            throw failure
+
+        override fun getActiveEngine(): com.donian.myaitutor.tutor.LlmInferenceEngine? = null
+
+        override suspend fun releaseActive() = Unit
+
+        override suspend fun switchTo(
+            target: AppModel
+        ): Result<com.donian.myaitutor.tutor.LlmInferenceEngine> = Result.failure(failure)
+    }
+
+    @Test
+    fun `CPU 폴백 차단은 준비된 안내 문구로 표시한다`() = runTest {
+        val provider = StringProvider { resId, _ ->
+            if (resId == com.donian.myaitutor.R.string.error_cpu_fallback_blocked) {
+                "CPU_BLOCKED"
+            } else {
+                "기타"
+            }
+        }
+        val failure = ModelTransitionException(
+            target = AppModel.QWEN3,
+            recoveredToPrevious = false,
+            message = "Qwen3 CPU 폴백이 차단되었습니다 (가용 메모리 부족).",
+            cause = CpuFallbackBlockedException("차단")
+        )
+        val (vm, _) = createViewModel(
+            this,
+            stringProvider = provider,
+            runtimeCoordinator = FailingCoordinator(failure)
+        )
+
+        vm.setSelectedModel(AppModel.QWEN3)
+        advanceUntilIdle()
+
+        assertEquals("CPU_BLOCKED", vm.state.value.transitionFailure)
+        assertEquals(ModelRuntimeState.NO_MODEL_LOADED, vm.state.value.runtimeState)
+    }
+
+    @Test
+    fun `일반 전환 실패는 예외 메시지를 그대로 표시한다`() = runTest {
+        val failure = ModelTransitionException(
+            target = AppModel.QWEN3,
+            recoveredToPrevious = false,
+            message = "엔진 초기화 실패"
+        )
+        val (vm, _) = createViewModel(this, runtimeCoordinator = FailingCoordinator(failure))
+
+        vm.setSelectedModel(AppModel.QWEN3)
+        advanceUntilIdle()
+
+        assertEquals("엔진 초기화 실패", vm.state.value.transitionFailure)
     }
 }

@@ -5,6 +5,7 @@ import android.util.Log
 import com.donian.myaitutor.BuildConfig
 import com.donian.myaitutor.R
 import com.donian.myaitutor.ai.Assistant
+import com.donian.myaitutor.ai.CpuFallbackBlockedException
 import com.donian.myaitutor.ai.GemmaAssistant
 import com.donian.myaitutor.ai.TutorGrade
 import com.donian.myaitutor.camera.ImageCropper
@@ -341,8 +342,10 @@ class HomeViewModel(
                     _state.value = _state.value.copy(
                         selectedModel = restoredModel,
                         runtimeState = if (recovered) ModelRuntimeState.ACTIVE else ModelRuntimeState.NO_MODEL_LOADED,
-                        transitionFailure = error.message
-                            ?: stringProvider.get(R.string.error_model_transition_failed),
+                        transitionFailure = transitionFailureMessage(
+                            error,
+                            R.string.error_model_transition_failed
+                        ),
                         freeChatBlockedReason = freeChatBlockedReasonFor(restoredModel),
                         modelSelectionBlockedReason = modelSelectionBlockedReasonFor(restoredModel)
                     )
@@ -391,8 +394,10 @@ class HomeViewModel(
                 onFailure = { error ->
                     _state.value = _state.value.copy(
                         runtimeState = ModelRuntimeState.NO_MODEL_LOADED,
-                        transitionFailure = error.message
-                            ?: stringProvider.get(R.string.error_model_transition_failed),
+                        transitionFailure = transitionFailureMessage(
+                            error,
+                            R.string.error_model_transition_failed
+                        ),
                         isNoModelDismissed = false
                     )
                 }
@@ -448,8 +453,7 @@ class HomeViewModel(
                 onFailure = { error ->
                     _state.value = _state.value.copy(
                         runtimeState = ModelRuntimeState.NO_MODEL_LOADED,
-                        transitionFailure = error.message
-                            ?: stringProvider.get(R.string.error_no_model_loaded)
+                        transitionFailure = transitionFailureMessage(error, R.string.error_no_model_loaded)
                     )
                 }
             )
@@ -466,6 +470,24 @@ class HomeViewModel(
 
     private fun snapshotFor(model: AppModel): ModelDownloadSnapshot =
         if (model == AppModel.QWEN3) qwenModelManager.snapshot() else modelManager.snapshot()
+
+    /**
+     * 모델 로드 실패 문구를 고릅니다.
+     *
+     * CPU 폴백 차단은 준비된 안내 문구([R.string.error_cpu_fallback_blocked])로 알리고,
+     * 그 외에는 예외 메시지를 그대로 사용합니다. [ModelTransitionException]이 원인을 cause로
+     * 감싸므로 원인 체인을 따라 확인합니다.
+     */
+    private fun transitionFailureMessage(error: Throwable, fallbackStringRes: Int): String {
+        var current: Throwable? = error
+        while (current != null) {
+            if (current is CpuFallbackBlockedException) {
+                return stringProvider.get(R.string.error_cpu_fallback_blocked)
+            }
+            current = current.cause
+        }
+        return error.message ?: stringProvider.get(fallbackStringRes)
+    }
 
     /** 지정한 모델의 다운로드를 시작한다. Gemma와 Qwen은 각각 독립 관리된다. */
     fun startModelDownload(model: AppModel) {

@@ -2,6 +2,7 @@ package com.donian.myaitutor.ai
 
 import android.app.ActivityManager
 import android.content.Context
+import android.os.Debug
 import android.util.Log
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Content
@@ -247,6 +248,7 @@ class QwenAssistant(context: Context) : Assistant {
                 engine = candidate
                 conversation = candidateConversation
                 selectedBackendLabel = backendName
+                logRssUsageIfExcessive(backendName)
                 return
             } catch (error: Exception) {
                 lastError = error
@@ -255,7 +257,10 @@ class QwenAssistant(context: Context) : Assistant {
         }
 
         if (availMem < CPU_FALLBACK_MIN_AVAIL_BYTES) {
-            throw IllegalStateException("Qwen3 CPU 폴백이 차단되었습니다 (가용 메모리 ${availMem} bytes < ${CPU_FALLBACK_MIN_AVAIL_BYTES}).", lastError)
+            throw CpuFallbackBlockedException(
+                "Qwen3 CPU 폴백이 차단되었습니다 (가용 메모리 ${availMem} bytes < ${CPU_FALLBACK_MIN_AVAIL_BYTES}).",
+                lastError
+            )
         }
         throw IllegalStateException(
             "Qwen3-4B-Instruct-2507가 GPU와 CPU에서 모두 초기화하지 못했습니다. 기기 메모리와 모델 파일을 확인해 주세요.",
@@ -273,4 +278,39 @@ class QwenAssistant(context: Context) : Assistant {
             selectedBackendLabel = "미실행"
         }
     }
+
+    /**
+     * 초기화 직후 실제 점유 메모리가 [PEAK_RSS_LIMIT_BYTES]를 넘으면 경고만 남깁니다.
+     *
+     * 기기별로 GPU 메모리 집계 방식이 달라 로드를 실패시키지 않고 관측값 확보를 우선합니다.
+     */
+    private fun logRssUsageIfExcessive(backendName: String) {
+        val usedBytes = totalPssBytes()
+        if (usedBytes <= 0L) return
+        if (usedBytes > PEAK_RSS_LIMIT_BYTES) {
+            Log.w(
+                TAG,
+                "$backendName 백엔드 초기화 후 점유 메모리가 한도($PEAK_RSS_LIMIT_BYTES bytes)를 " +
+                    "넘었습니다: $usedBytes bytes"
+            )
+        } else {
+            Log.i(TAG, "$backendName 백엔드 초기화 후 점유 메모리: $usedBytes bytes")
+        }
+    }
+
+    private fun totalPssBytes(): Long =
+        runCatching {
+            val info = Debug.MemoryInfo()
+            Debug.getMemoryInfo(info)
+            info.totalPss.toLong() * 1024L
+        }.getOrDefault(0L)
 }
+
+/**
+ * Qwen CPU 폴백이 가용 메모리 부족으로 차단되었음을 나타냅니다.
+ * UI는 이 타입을 확인해 준비된 안내 문구로 사용자에게 전달합니다.
+ */
+class CpuFallbackBlockedException(
+    message: String,
+    cause: Throwable? = null
+) : IllegalStateException(message, cause)
