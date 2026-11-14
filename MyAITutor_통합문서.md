@@ -78,7 +78,7 @@
 | [완료] | Assistant 레거시 콜백 API 제거 (학년 하드코딩 해소) | 13.2-8 | `analyzeImage`/`askFollowUp`/`collectLegacy` 삭제 |
 | [완료] | 컨텍스트 토큰 표기를 선택 모델 기준으로 분기 | 13.3 | `HomeUiState.maxContextTokens` 계산 속성 |
 | [완료] | 진행 단계 상세 문구 모델명 분기 | 10.3 | `home_stage_model_detail` %1$s 치환 |
-| [완료] | Qwen 2,048 컨텍스트 예산 강제 (입력 축약 + 초과 안내) | 10.3 | `QwenContextBudget` + 12개 단위 테스트 |
+| [완료] | Qwen 컨텍스트 예산 관리 (입력 축약 + 초과 안내) | 10.3 | `QwenContextBudget` + 10개 단위 테스트 |
 | [완료] | Qwen 선택 시 생각 모드 카드 비활성화 | 10.3 | `thinkingSupported` 스위치 |
 | [완료] | Qwen 다운로드 시작 시 가용 메모리 확인 | 10.3 | `canStartDownload` + 저장소/메모리 판정 |
 | [완료] | Qwen 검증 캐시를 파일 지문(크기·수정시각)에 바인딩 | 5.3 / 13.3 | 파일 교체 시 재검증 |
@@ -93,7 +93,7 @@
 | [완료] | Gemma 해시 검증 I/O 오류 처리 | 13.4 | Qwen 패리티(판정 객체·파일 지문·정확 일치) + I/O 백오프 |
 | [미진행] | 실기기 테스트 전 항목 (11.4) | 11.4 | 모든 수정 완료 후 마지막 단계 |
 | [보류] | 다크 테마 도입 (도입 계획 없음) | 13.3 | 사용자 결정: 도입 계획 없음, 별도 승인 시 재검토 |
-| [미진행] | Qwen 2,048 예산 추정치 실제 토크나이저 검증 | 10.3 | 단위 테스트와 함께 실제 기기 검증 필요 |
+| [완료] | Qwen 컨텍스트·출력 예산을 Gemma와 동일하게 확대 | 4.1 / 10.2 | 2,048→4,096, 1,536→3,072, 512→1,024. KV 캐시 2배 (실기기 GPU 초기화 확인) |
 
 ---
 
@@ -213,9 +213,9 @@
 | `tutor/TutorStreamParserTest.kt` | 13 | 스트림 파서 |
 | `model/ModelRuntimeStateTest.kt` | 11 | `RuntimeStatus` 불변식 |
 | `model/ModelSelectionRepositoryTest.kt` | 10 | 선택 저장소·정규화 |
-| `model/QwenContextBudgetTest.kt` | 10 | Qwen 2,048 컨텍스트 예산 |
+| `model/QwenContextBudgetTest.kt` | 10 | Qwen 컨텍스트 예산 (4,096 기준) |
 | `ui/loading/ModelLoadingPhaseTest.kt` | 10 | `resolveModelLoadingPhase` |
-| `ui/text/AnswerSegmentsTest.kt` | 9 | 수식 분리·SUGGESTIONS 파싱 |
+| `ui/text/AnswerSegmentsTest.kt` | 5 | 수식 분리 |
 | `ocr/OcrTextPostProcessorTest.kt` | 7 | OCR 후처리 |
 | `model/ModelDownloadSnapshotTest.kt` | 5 | 다운로드 스냅샷·Gemma URL |
 | `ui/text/AnswerMarkdownTest.kt` | 4 | 마크다운 변환 |
@@ -331,9 +331,9 @@ ModelRuntimeCoordinator.switchTo()  [mutex 직렬화]
 | 역할 | 기본 엔진, 자유 대화 + 학습 | 학습 모드 전용 |
 | Backend | GPU 우선 → CPU 폴백 | GPU 우선 → CPU 폴백 (**조건부**) |
 | CPU 폴백 조건 | 제한 없음 | `availMem >= 5,368,709,120` bytes (5GB) |
-| `maxNumTokens` | `MAX_CONTEXT_TOKENS` = 4,096 | `QWEN_MAX_CONTEXT_TOKENS` = 2,048 |
-| 대화 리셋 임계값 | `MAX_CONVERSATION_TOKENS` = 3,072 (계산식) | `QWEN_MAX_CONVERSATION_TOKENS` = 1,536 |
-| 기본 출력 상한 | `DEFAULT_MAX_OUTPUT_TOKENS` = 1,024 | `QWEN_DEFAULT_OUTPUT_TOKENS` = 512 |
+| `maxNumTokens` | `MAX_CONTEXT_TOKENS` = 4,096 | `QWEN_MAX_CONTEXT_TOKENS` = 4,096 |
+| 대화 리셋 임계값 | `MAX_CONVERSATION_TOKENS` = 3,072 (계산식) | `QWEN_MAX_CONVERSATION_TOKENS` = 3,072 |
+| 기본 출력 상한 | `DEFAULT_MAX_OUTPUT_TOKENS` = 1,024 | `QWEN_DEFAULT_OUTPUT_TOKENS` = 1,024 |
 | Thinking | 사용자 설정 기반 (`thinkingEnabled` 토글) | **항상 false** (명시적 `ThinkingConfig(false)`) |
 | Sampler | topK=20, topP=0.9, temperature=0.35 | topK=20, topP=0.8, temperature=0.7 |
 | Chat Template | 모델 메타데이터 기본값 | `Qwen3ChatTemplate.TEMPLATE` 명시 지정 |
@@ -409,7 +409,7 @@ ModelRuntimeCoordinator.switchTo()  [mutex 직렬화]
 | 정확한 크기 | 3,659,530,240 bytes (약 3.66GB) | 2,659,057,664 bytes (약 2.66GB) |
 | 최소 허용 크기 | 정확한 크기 일치 필수 (엔진 초기화만 `MIN_MODEL_BYTES` = 3,500,000,000) | 정확한 크기 일치 필수 |
 | SHA-256 | `0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0` | `9e48b165836256f5344d9d044930607b9c47f6ef34e27f82e96881664f3ba2fd` |
-| 컨텍스트 | 32k 기본 (앱에서 4,096으로 제한) | 2,048 |
+| 컨텍스트 | 32k 기본 (앱에서 4,096으로 제한) | 262,144 기본 (앱에서 4,096으로 제한) |
 | 라이선스 | Apache-2.0 | Apache-2.0 |
 | SharedPreferences | `focus_ai_model_manager` | `focus_ai_qwen_model_manager` |
 
@@ -456,7 +456,7 @@ ModelRuntimeCoordinator.switchTo()  [mutex 직렬화]
 
 | 항목 | 모델 카드 값 | 비고 |
 |---|---|---|
-| 컨텍스트 | 2,048 tokens | `max sequence length` 별도 명시 없음 |
+| 컨텍스트 | 262,144 tokens (네이티브, YaRN으로 1M 확장 가능) | 앱에서 4,096으로 제한 |
 | 외부 가중치 | 없음 | `.litertlm` 1개만 존재 |
 | LiteRT-LM 최소 버전 | 명시 없음 | 벤치마크는 v0.13.1 / v0.16.0 기준 |
 | GPU 메모리 | Galaxy S26 약 1.53GB / vivo V2502A 4.72GB / TECNO LJ9 4.90GB | **기기 편차 매우 큼** |
@@ -485,7 +485,7 @@ ModelRuntimeCoordinator.switchTo()  [mutex 직렬화]
 **Qwen은 학습 모드 전용이다. 자유 대화 모드는 Gemma에서만 동작한다.**
 
 근거:
-1. **토큰 예산** — 2,048 한도에서 자유 대화 지시문이 대부분을 consumed한다.
+1. **토큰 예산** — 자유 대화 지시문(`ChatSystemInstruction` 약 502토큰)이 학습 지시문(514토큰)과 맞먹어, 4,096 컨텍스트에서도 입력 예산을 크게 잠식한다.
 2. **제품 정책** — 자유 대화의 반말 페르소나는 Gemma에서 검증된 동작이며 Qwen에서 동일 품질을 낼 근거가 없다.
 
 | 상황 | 동작 | 구현 지점 |
@@ -497,7 +497,7 @@ ModelRuntimeCoordinator.switchTo()  [mutex 직렬화]
 > [!IMPORTANT]
 > `chatMode`와 선택 모델은 **항상 정합 상태**여야 한다. 정규화는 `PrefsModelSelectionRepository.get()` 단일 지점에서 담당한다.
 
-이 제약으로 Qwen이 `ChatSystemInstruction`·`ChatSafetyInstruction`을 전혀 사용하지 않아 2,048 예산 압박이 완화된다. 학습 모드 지시문만 사용한다.
+이 제약으로 Qwen이 `ChatSystemInstruction`·`ChatSafetyInstruction`을 전혀 사용하지 않아 예산 압박이 완화된다. 학습 모드 지시문만 사용한다.
 
 ### 6.3 단일 메모리 상주 불변식
 
@@ -739,7 +739,7 @@ data class OcrBlock(
 | (1) 단일 모델 메모리 로딩/전환 보장 | **완료** |
 | (2) Qwen Chat Template 호환성 | **완료** (Jinja 실렌더링 검증 제외) |
 | (3) 파일 크기·SHA 검증 | **완료** |
-| (4) 2,048 토큰 예산 관리 | **부분 완료** — 상수·초기 예산 완료. 출력 예산 동적 계산, OCR 블록 축약은 미구현 |
+| (4) 4,096 토큰 예산 관리 | **부분 완료** — 상수·초기 예산 완료(2026-11-15 4,096으로 확대). 출력 예산 동적 계산, OCR 블록 축약은 미구현 |
 | (5) 실기기 GPU/CPU 메모리 검증 | **미착수** |
 
 ### 10.3 미완성 항목
@@ -748,10 +748,10 @@ data class OcrBlock(
 |---|---|---|
 | **Qwen 엔진 초기화 전 SHA 검증 미강제** | `QwenAssistant.ensureInitializedOnRuntimeThread()`가 크기만 `require`로 확인하고 SHA 검증 완료(`KEY_HASH_VERIFIED`)는 확인하지 않는다 (13.2-3) | 크기만 같은 손상된 파일로 엔진이 초기화될 수 있다. UI 경로(`setSelectedModel`이 `READY` 요구)를 통해서만 진입하므로 임팩트는 제한적이나, 초기화 경로 자체에는 검증이 없다 |
 | peak RSS 모니터링 | `QwenAssistant.PEAK_RSS_LIMIT_BYTES`(5.5GB)가 **선언만** 되어 있고 참조 0건 | 5.5GB 초과 시 자동 중단 규칙이 동작하지 않는다 |
-| OCR 입력 블록 축약 | 미구현. 출력 예산 ≤ 0 시 블록 경계 축약 없음 | 긴 OCR 입력에서 2,048 초과 가능 |
+| OCR 입력 블록 축약 | 미구현. 출력 예산 ≤ 0 시 블록 경계 축약 없음 | 긴 OCR 입력에서 4,096 초과 가능 (입력 예산 2,554토큰 기준 약 7,662자) |
 | `error_context_overflow` 문자열 | 정의만, 참조 0건 | 위 미구현의 부수 증거 |
 | `error_cpu_fallback_blocked` 문자열 | 정의만, 참조 0건 | CPU 차단이 `IllegalStateException` 메시지로만 전파되고 UI 안내로 연결되지 않는다 |
-| 컨텍스트 토큰 표시 | `HomeUiState.maxContextTokens = MAX_CONTEXT_TOKENS`(4,096)이 모델 분기 없이 표시 | Qwen 활성 시 화면 수치가 실제 한도의 2배 |
+| 컨텍스트 토큰 표시 | `HomeUiState.maxContextTokens`가 선택 모델별로 분기됨 (Gemma 4,096 / Qwen 4,096) | 두 모델이 같은 값이라 분기 효과는 없으나, 향후 상이해질 수 있음 |
 | Thinking 카드 | `SettingsScreen`에서 선택 모델과 무관하게 항상 표시. 제목 "Gemma 4 생각 모드" | 동작 오류는 없으나(QwenAssistant가 false 강제) Qwen에서도 반영되는 것처럼 보임 |
 | Qwen 다운로드 중 메모리 확인 | `startDownload()`이 저장 공간만 확인, `availMem` 미확인 | 3GB 미만일 때 다운로드 일시 중단 규칙 미구현 |
 | `home_stage_gemma_detail` | 진행 단계 **제목**은 분기 완료, **상세 문구**는 "Gemma 4 E4B에 전달해 풀이하고 있습니다"로 고정 | Qwen 분석 중에도 상세 문구는 Gemma 지칭 |
@@ -799,7 +799,7 @@ data class OcrBlock(
 - 검증 완료 후 파일 변경 시 캐시 무효화
 - 여러 `Content.Text` 조각 순서·multi-turn 경계 유지
 - Qwen에서 자유 대화 프롬프트 미생성
-- 출력 예산이 2,048을 넘지 않는지
+- 출력 예산이 4,096을 넘지 않는지
 - Thinking OFF 시 Thought 텍스트가 답변에 섞이지 않는지
 - 전환 실패 시 3선택지 다이얼로그 표시
 - CPU fallback 차단 메시지 표시
@@ -833,7 +833,7 @@ data class OcrBlock(
 
 1. 사용자 질문이 Qwen 템플릿에서 비어 있지 않게 전달된다.
 2. 파일 크기와 SHA-256을 모두 확인한 경우에만 READY가 된다.
-3. 모든 요청이 2,048 컨텍스트 제한을 준수한다.
+3. 모든 요청이 4,096 컨텍스트 제한을 준수한다.
 4. 한국어 추론·스트리밍·취소·후속 대화가 실기기에서 정상 동작한다.
 5. GPU/CPU 선택이 테스트된 메모리 범위 안에서 안전하다.
 6. 화면·알림에 현재 선택 또는 다운로드 중인 모델의 정확한 이름·용량·상태가 표시된다.
@@ -1116,7 +1116,7 @@ needsHashVerification() → 백오프 중이면 false
 | 항목 | 값 | 비고 |
 |---|---|---|
 | Gemma 컨텍스트 | 4,096 | KV 캐시 예산 |
-| Qwen 컨텍스트 | 2,048 | 더 보수적 |
+| Qwen 컨텍스트 | 4,096 | Gemma와 동일, KV 캐시 2배 주의 |
 | 이미지 정규화 장변 | 2,400px | OCR 입력 상한 |
 | OCR 디텍션 상한 | 4,000px (`detMaxSideLimit`) | 32의 배수 정렬 |
 | 미리보기 장변 | 1,600px | OOM 방지 |
@@ -1150,7 +1150,7 @@ Android Studio 인덱스 기반 도구로 HEAD `5bd9189` 코드를 직접 읽어
 
 - **빌드와 테스트는 미실행.** 200개는 `@Test` 개수이며 통과 여부는 미확인이다. (단, 2026-11-15 HomeViewModel 분리 및 Gemma 해시 검증 정비 시 200/200 통과를 별도로 확인했다.)
 - 모델 카드의 파일 크기·SHA-256이 실제 다운로드 파일과 일치하는지
-- 2,048 토큰 한도와 학습 모드 지시문의 실제 토큰 점유율
+- 4,096 토큰 한도와 학습 모드 지시문의 실제 토큰 점유율 (KV 캐시 2배에 따른 실기기 메모리 포함)
 - GPU/CPU 백엔드별 실제 피크 메모리 (기기 편차 큼)
 - `chatTemplate` 지정 시 typed parts가 실제 user 본문으로 렌더링되는지
 - ANR·OOM·경쟁 조건 등 런타임 거동 (12장의 항목 중 상당수는 정적 추론이다)
