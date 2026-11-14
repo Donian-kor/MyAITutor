@@ -132,7 +132,7 @@
     <string name="home_stage_ocr">사진에서 글자를 읽는 중 · PaddleOCR</string>
     <string name="home_stage_ocr_detail">PaddleOCR이 사진 속 글자를 인식하고 있습니다.</string>
     <string name="home_stage_model">나만의 AI쌤 · %1$s</string>
-    <string name="home_stage_gemma_detail">PaddleOCR이 읽은 텍스트를 Gemma 4 E4B에 전달해 풀이하고 있습니다.</string>
+    <string name="home_stage_model_detail">PaddleOCR이 읽은 텍스트를 %1$s에 전달해 풀이하고 있습니다.</string>
     <string name="home_ocr_show">PaddleOCR 인식 내용 보기</string>
     <string name="home_ocr_hide">PaddleOCR 인식 내용 숨기기</string>
     <string name="home_ocr_explanation">나만의 Ai쌤은 사진을 직접 읽지 않고, 아래 PaddleOCR 인식 텍스트를 받아 풀이합니다.</string>

@@ -215,6 +215,23 @@ internal fun HomeScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                            // 단계 상세 문구. 모델명이 선택 모델에 맞게 치환됩니다.
+                            val detailText = when {
+                                analysisStage == ImageAnalysisStage.OCR ->
+                                    stringResource(R.string.home_stage_ocr_detail)
+                                analysisStage == ImageAnalysisStage.GEMMA || isAnalyzing ->
+                                    stringResource(R.string.home_stage_model_detail, selectedModelName)
+                                else -> null
+                            }
+                            if (detailText != null) {
+                                Text(
+                                    text = detailText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colors.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                             if (tokenCount > 0) {
                                 Spacer(Modifier.height(3.dp))
                                 Surface(
