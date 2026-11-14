@@ -15,7 +15,6 @@ import com.google.ai.edge.litertlm.ThinkingConfig
 import com.donian.myaitutor.model.QwenModelDownloadManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -36,7 +35,6 @@ class QwenAssistant(context: Context) : Assistant {
     companion object {
         private const val TAG = "QwenAssistant"
         private const val THOUGHT_CHANNEL = "thought"
-        private const val EMPTY_RESPONSE_ERROR = "AI 추론 결과가 비어 있습니다."
         internal const val QWEN_MAX_CONTEXT_TOKENS: Int = 2_048
         internal const val QWEN_MAX_CONVERSATION_TOKENS: Int = 1_536
         internal const val QWEN_DEFAULT_OUTPUT_TOKENS: Int = 512
@@ -153,48 +151,6 @@ class QwenAssistant(context: Context) : Assistant {
         val stopped = withTimeoutOrNull(timeoutMillis) { active.await() } != null
         if (stopped) cancelRequested.set(false)
         return stopped
-    }
-
-    override suspend fun analyzeImage(ocrText: String, subject: String, onTextChanged: suspend (String) -> Unit) {
-        require(ocrText.isNotBlank()) { "인식된 문제 텍스트가 없습니다." }
-        collectLegacy(
-            request = AssistantRequest(
-                textParts = listOf("[OCR 인식 텍스트]\n$ocrText", analyzeImagePrompt(subject, TutorGrade.ELEMENTARY)),
-                startsNewProblem = true
-            ),
-            onTextChanged = onTextChanged
-        )
-    }
-
-    override suspend fun askFollowUp(question: String, subject: String, onTextChanged: suspend (String) -> Unit) {
-        require(question.isNotBlank()) { "질문 내용을 입력해 주세요." }
-        collectLegacy(
-            request = AssistantRequest(
-                textParts = listOf(followUpPrompt(question, subject, TutorGrade.ELEMENTARY)),
-                startsNewProblem = false
-            ),
-            onTextChanged = onTextChanged
-        )
-    }
-
-    private suspend fun collectLegacy(request: AssistantRequest, onTextChanged: suspend (String) -> Unit) {
-        val accumulated = StringBuilder()
-        var received = false
-        streamAnswer(request).collect { event ->
-            when (event) {
-                is AssistantStreamEvent.Answer -> {
-                    accumulated.append(event.text)
-                    received = true
-                    withContext(Dispatchers.Main.immediate) {
-                        onTextChanged(accumulated.toString())
-                    }
-                }
-                is AssistantStreamEvent.Error -> throw IllegalStateException(event.message)
-                AssistantStreamEvent.Cancelled -> throw CancellationException("AI 추론이 취소되었습니다.")
-                AssistantStreamEvent.Completed, AssistantStreamEvent.ThoughtActivity -> Unit
-            }
-        }
-        if (!received) throw IllegalStateException(EMPTY_RESPONSE_ERROR)
     }
 
     override suspend fun backendLabel(): String = withContext(runtimeDispatcher) { selectedBackendLabel }

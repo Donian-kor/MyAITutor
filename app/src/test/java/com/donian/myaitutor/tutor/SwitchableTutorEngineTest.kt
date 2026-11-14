@@ -238,18 +238,6 @@ class SwitchableTutorEngineTest {
 
         override suspend fun resetConversation(systemInstruction: String) = Unit
 
-        override suspend fun analyzeImage(
-            ocrText: String,
-            subject: String,
-            onTextChanged: suspend (String) -> Unit
-        ) = Unit
-
-        override suspend fun askFollowUp(
-            question: String,
-            subject: String,
-            onTextChanged: suspend (String) -> Unit
-        ) = Unit
-
         override suspend fun backendLabel(): String = "NONE"
 
         override suspend fun getTokenCount(): Int = 0

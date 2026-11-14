@@ -94,24 +94,6 @@ class HomeViewModelTest {
             lastSystemInstruction = systemInstruction
         }
 
-        override suspend fun analyzeImage(
-            ocrText: String,
-            subject: String,
-            onTextChanged: suspend (String) -> Unit
-        ) {
-            streamCalls++
-            onTextChanged("분석 결과")
-        }
-
-        override suspend fun askFollowUp(
-            question: String,
-            subject: String,
-            onTextChanged: suspend (String) -> Unit
-        ) {
-            streamCalls++
-            onTextChanged("후속 답변")
-        }
-
         override suspend fun backendLabel(): String = "TEST"
         override suspend fun getTokenCount(): Int = 0
         override fun cancelGeneration() {

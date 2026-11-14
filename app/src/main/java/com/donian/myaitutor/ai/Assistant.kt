@@ -54,9 +54,7 @@ interface Assistant {
      */
     suspend fun resetConversation(systemInstruction: String = SystemInstruction)
 
-    // 기존 호출부 호환 API. 스트리밍 API로도 동일한 요청을 수행할 수 있습니다.
-    suspend fun analyzeImage(ocrText: String, subject: String, onTextChanged: suspend (String) -> Unit)
-    suspend fun askFollowUp(question: String, subject: String, onTextChanged: suspend (String) -> Unit)
+    // 실제 호출 경로는 [streamAnswer] 하나뿐입니다. 프롬프트 조립은 튜터 엔진이 담당합니다.
     suspend fun backendLabel(): String
     suspend fun getTokenCount(): Int
     fun cancelGeneration()
