@@ -201,6 +201,18 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
 
     override fun isModelReady(): Boolean = snapshot().status == ModelDownloadStatus.READY
 
+    /**
+     * 크기 검증과 저장된 SHA-256 검증 결과를 모두 통과했는지 확인한다.
+     *
+     * [isModelReady]는 [DownloadManager] 조회까지 포함해 무거우므로, 엔진 초기화 경로처럼
+     * 파일 검증만 필요한 곳에서는 이 함수를 사용한다.
+     */
+    fun isFileVerified(): Boolean =
+        modelFile.isFile &&
+            modelFile.length() == EXPECTED_MODEL_BYTES &&
+            !preferences.getBoolean(KEY_HASH_MISMATCH, false) &&
+            preferences.getBoolean(KEY_HASH_VERIFIED, false)
+
     override fun needsHashVerification(): Boolean {
         if (EXPECTED_MODEL_SHA256.isEmpty()) return false
         if (!modelFile.isFile || modelFile.length() != EXPECTED_MODEL_BYTES) return false

@@ -252,10 +252,12 @@ class QwenAssistant(context: Context) : Assistant {
     private suspend fun ensureInitializedOnRuntimeThread() {
         if (engine != null && conversation != null) return
 
-        val modelFile = QwenModelDownloadManager(appContext).modelFile
-        require(modelFile.isFile && modelFile.length() == QwenModelDownloadManager.EXPECTED_MODEL_BYTES) {
-            "Qwen3-4B-Instruct-2507 모델이 설치되지 않았습니다. 설정에서 모델을 다운로드해 주세요."
+        // 크기만으로는 손상된 파일을 걸러낼 수 없으므로 저장된 SHA-256 검증 완료 상태까지 요구한다.
+        val downloadManager = QwenModelDownloadManager(appContext)
+        require(downloadManager.isFileVerified()) {
+            "Qwen3-4B-Instruct-2507 모델 검증이 완료되지 않았습니다. 설정에서 다운로드와 검증을 완료해 주세요."
         }
+        val modelFile = downloadManager.modelFile
 
         val am = appContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val memInfo = ActivityManager.MemoryInfo()
