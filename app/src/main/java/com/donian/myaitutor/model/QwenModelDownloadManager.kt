@@ -51,14 +51,14 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
                 status = ModelDownloadStatus.READY,
                 downloadedBytes = modelFile.length(),
                 totalBytes = total,
-                message = appContext.getString(R.string.dl_msg_ready)
+                message = appContext.getString(R.string.qwen_dl_msg_ready)
             )
 
             QwenModelVerification.Verdict.NEEDS_HASH_VERIFICATION -> ModelDownloadSnapshot(
                 status = ModelDownloadStatus.VERIFYING,
                 downloadedBytes = modelFile.length(),
                 totalBytes = total,
-                message = appContext.getString(R.string.dl_msg_verifying)
+                message = appContext.getString(R.string.qwen_dl_msg_verifying)
             )
 
             QwenModelVerification.Verdict.MISMATCH -> failedSnapshot(
@@ -86,14 +86,14 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
                     status = ModelDownloadStatus.READY,
                     downloadedBytes = modelFile.length(),
                     totalBytes = EXPECTED_MODEL_BYTES,
-                    message = appContext.getString(R.string.dl_msg_ready)
+                    message = appContext.getString(R.string.qwen_dl_msg_ready)
                 )
 
                 QwenModelVerification.Verdict.NEEDS_HASH_VERIFICATION -> return ModelDownloadSnapshot(
                     status = ModelDownloadStatus.VERIFYING,
                     downloadedBytes = modelFile.length(),
                     totalBytes = EXPECTED_MODEL_BYTES,
-                    message = appContext.getString(R.string.dl_msg_verifying)
+                    message = appContext.getString(R.string.qwen_dl_msg_verifying)
                 )
 
                 QwenModelVerification.Verdict.MISMATCH -> return failedSnapshot(
@@ -110,7 +110,7 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
                 status = ModelDownloadStatus.NOT_INSTALLED,
                 downloadedBytes = 0L,
                 totalBytes = EXPECTED_MODEL_BYTES,
-                message = appContext.getString(R.string.dl_msg_not_installed)
+                message = appContext.getString(R.string.qwen_dl_msg_not_installed)
             )
         }
 
@@ -131,7 +131,7 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
                 )
                 DownloadManager.STATUS_RUNNING -> ModelDownloadSnapshot(
                     ModelDownloadStatus.DOWNLOADING, downloaded, total,
-                    appContext.getString(R.string.dl_msg_downloading)
+                    appContext.getString(R.string.qwen_dl_msg_downloading)
                 )
                 DownloadManager.STATUS_PAUSED -> ModelDownloadSnapshot(
                     ModelDownloadStatus.PAUSED, downloaded, total,
@@ -170,8 +170,8 @@ class QwenModelDownloadManager(context: Context) : ModelDownloadRepository {
         }
 
         val request = DownloadManager.Request(MODEL_DOWNLOAD_URL.toUri())
-            .setTitle(appContext.getString(R.string.dl_notification_title))
-            .setDescription(appContext.getString(R.string.dl_notification_desc))
+            .setTitle(appContext.getString(R.string.qwen_dl_notification_title))
+            .setDescription(appContext.getString(R.string.qwen_dl_notification_desc))
             .setMimeType("application/octet-stream")
             .setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI)
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)

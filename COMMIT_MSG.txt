@@ -1,12 +1,13 @@
-style: 설정 메뉴 UI 섹션 순서 재배치
+refactor: AI 모델 선택 및 다운로드 섹션카드 통합 및 Qwen 다운로드 문구 수정
 
-요청사항에 맞춰 설정 메뉴의 섹션 순서를 조정했습니다.
+1. AI 모델 다운로드 섹션과 선택 섹션 카드를 하나로 통합 (ModelSelectionCard)
+   - 다운로드 완료된 모델은 선택 라디오/행 클릭 시 바로 활성 모델로 전환
+   - 각 모델별 다운로드 상태, 진행률, 다운로드/삭제 버튼을 통합 카드 내부 항목에 배치
+2. Qwen 모델 다운로드 상태 및 알림 문자열 오류 수정
+   - QwenModelDownloadManager에서 Gemma 전용 문자열 리소스를 참조하여
+     "Gemma 4 E4B 모델 다운로드 중"으로 노출되던 문제 해결
+   - qwen_dl_msg_* 및 qwen_dl_notification_* 문자열을 신규 정의하여
+     실제 다운로드 파일(Qwen3-4B-Instruct-2507, qwen3_4b_instruct_2507_mixed_int4.litertlm)에
+     맞는 정확한 모델명("Qwen3-4B-Instruct-2507 모델 다운로드 중")이 표기되도록 수정
 
-1. 최상단: 설정 헤더 카드
-2. 두번째: 젬마4 / Qwen 모델 다운로드 및 검증 UI 카드 (ModelDownloadCard)
-3. 세번째: AI 모델 선택 및 추론(Thinking) 토글 UI 카드 (ModelSelectionCard + ThinkingModeCard)
-4. 그다음: 정보 카드들 (OCR 출처, 다운로드 안내, 학습 방식, 개인정보)
-5. 버전 정보 카드
-6. 최하단: 임시 파일 캐시 정리 / 오픈소스 라이선스 버튼
-
-단위 테스트 146개 모두 통과 및 실기기 렌더링 검증 완료.
+단위 테스트 146개 전체 통과 및 실기기 렌더링/동작 검증 완료.

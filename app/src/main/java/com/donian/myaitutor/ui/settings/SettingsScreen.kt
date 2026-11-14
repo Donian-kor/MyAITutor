@@ -174,41 +174,32 @@ internal fun SettingsScreen(
                 }
             }
 
-            // 2) 젬마4와 큐웬 모델 다운로드 및 검증 UI 섹션 카드
+            // 2) 통합 AI 모델 선택 및 다운로드 카드 (Gemma / Qwen 선택, 상태, 다운로드/삭제)
             AnimatedVisibility(
                 visible = visible,
                 enter = fadeIn(animationSpec = tween(500, delayMillis = 100))
             ) {
-                ModelDownloadCard(
+                ModelSelectionCard(
+                    selectedModel = selectedModel,
                     gemmaSnapshot = snapshot,
                     qwenSnapshot = qwenSnapshot,
-                    selectedModel = selectedModel,
                     isTransitioning = isModelTransitioning,
-                    onDownload = onDownloadModel,
-                    onDelete = onDeleteModelFile
+                    blockedReason = modelSelectionBlockedReason,
+                    onModelSelected = onModelSelected,
+                    onDownloadModel = onDownloadModel,
+                    onDeleteModelFile = onDeleteModelFile
                 )
             }
 
-            // 3) AI 모델 선택 및 추론(Thinking) 토글 카드
+            // 3) 추론(Thinking) 모드 설정 카드
             AnimatedVisibility(
                 visible = visible,
                 enter = fadeIn(animationSpec = tween(500, delayMillis = 150))
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                    ModelSelectionCard(
-                        selectedModel = selectedModel,
-                        gemmaStatus = snapshot.status,
-                        qwenStatus = qwenSnapshot.status,
-                        isTransitioning = isModelTransitioning,
-                        blockedReason = modelSelectionBlockedReason,
-                        onModelSelected = onModelSelected
-                    )
-
-                    ThinkingModeCard(
-                        thinkingMode = thinkingMode,
-                        onThinkingModeChange = onThinkingModeChange
-                    )
-                }
+                ThinkingModeCard(
+                    thinkingMode = thinkingMode,
+                    onThinkingModeChange = onThinkingModeChange
+                )
             }
 
             // 4) 정보 카드들 (기존과 동일)
