@@ -137,8 +137,8 @@ fun FocusAiApp(host: HomeViewModelHost) {
         )
     } else if (showSettings) {
         SettingsScreen(
-            // 상단 Gemma 카드는 선택 모델(Gemma/Qwen)의 스냅샷을 그대로 사용한다.
-            snapshot = uiState.selectedModelSnapshot,
+            // Gemma/Qwen 카드는 각 모델의 다운로드 스냅샷을 독립적으로 사용한다.
+            snapshot = uiState.modelSnapshot,
             backendLabel = uiState.backendLabel,
             thinkingMode = uiState.thinkingMode,
             onThinkingModeChange = { viewModel.setThinkingMode(it) },

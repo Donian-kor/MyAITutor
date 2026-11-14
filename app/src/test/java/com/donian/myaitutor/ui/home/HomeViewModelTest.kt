@@ -124,12 +124,23 @@ class HomeViewModelTest {
 
     private class FakeRepo(private val ready: Boolean = true) : ModelDownloadRepository {
         override val modelFile: File = File("fake.litertlm")
-        override fun snapshot() = ModelDownloadSnapshot(
+        var downloadStarts = 0
+        private var currentSnapshot = ModelDownloadSnapshot(
             if (ready) ModelDownloadStatus.READY else ModelDownloadStatus.NOT_INSTALLED,
             0L, 0L, ""
         )
 
-        override fun startDownload(): Long = 1L
+        override fun snapshot() = currentSnapshot
+        override fun startDownload(): Long {
+            downloadStarts++
+            currentSnapshot = ModelDownloadSnapshot(
+                ModelDownloadStatus.DOWNLOADING,
+                100L,
+                1_000L,
+                "Gemma 다운로드 중"
+            )
+            return 1L
+        }
         override fun deleteModel() {}
         override fun isModelReady(): Boolean = ready
         override fun needsHashVerification(): Boolean = false
@@ -139,12 +150,23 @@ class HomeViewModelTest {
     /** Qwen 다운로드 상태를 테스트에서 주입할 수 있는 관리자 대역. */
     private class FakeQwenRepo(private val ready: Boolean = true) : ModelDownloadRepository {
         override val modelFile: File = File("fake_qwen.litertlm")
-        override fun snapshot() = ModelDownloadSnapshot(
+        var downloadStarts = 0
+        private var currentSnapshot = ModelDownloadSnapshot(
             if (ready) ModelDownloadStatus.READY else ModelDownloadStatus.NOT_INSTALLED,
             0L, 0L, ""
         )
 
-        override fun startDownload(): Long = 1L
+        override fun snapshot() = currentSnapshot
+        override fun startDownload(): Long {
+            downloadStarts++
+            currentSnapshot = ModelDownloadSnapshot(
+                ModelDownloadStatus.DOWNLOADING,
+                200L,
+                2_000L,
+                "Qwen 다운로드 중"
+            )
+            return 1L
+        }
         override fun deleteModel() {}
         override fun isModelReady(): Boolean = ready
         override fun needsHashVerification(): Boolean = false
@@ -207,6 +229,42 @@ class HomeViewModelTest {
             qwenModelManager = qwenModelManager
         )
         return vm to engine
+    }
+
+    @Test
+    fun `Qwen 다운로드는 Qwen 상태만 갱신하고 Gemma 다운로드는 Gemma 상태만 갱신한다`() = runTest {
+        val gemmaRepo = FakeRepo()
+        val qwenRepo = FakeQwenRepo()
+        val vm = HomeViewModel(
+            TestApp(),
+            gemmaRepo,
+            this,
+            kotlinx.coroutines.Dispatchers.Unconfined,
+            enablePolling = false,
+            ocrLogger = {},
+            stringProvider = StringProvider { _, _ -> "테스트" },
+            tutorEngine = FakeGemmaTutorEngine(),
+            appSettings = FakeAppSettings(),
+            selectionRepository = FakeSelectionRepository(),
+            qwenModelManager = qwenRepo
+        )
+
+        vm.startModelDownload(AppModel.QWEN3)
+
+        assertEquals(0, gemmaRepo.downloadStarts)
+        assertEquals(1, qwenRepo.downloadStarts)
+        assertEquals(ModelDownloadStatus.READY, vm.state.value.modelSnapshot.status)
+        assertEquals(ModelDownloadStatus.DOWNLOADING, vm.state.value.qwenSnapshot.status)
+        assertEquals("Qwen 다운로드 중", vm.state.value.qwenSnapshot.message)
+        assertEquals(ModelDownloadStatus.READY, vm.state.value.selectedModelSnapshot.status)
+
+        vm.startModelDownload(AppModel.GEMMA)
+
+        assertEquals(1, gemmaRepo.downloadStarts)
+        assertEquals(1, qwenRepo.downloadStarts)
+        assertEquals("Gemma 다운로드 중", vm.state.value.modelSnapshot.message)
+        assertEquals("Qwen 다운로드 중", vm.state.value.qwenSnapshot.message)
+        assertEquals(ModelDownloadStatus.DOWNLOADING, vm.state.value.selectedModelSnapshot.status)
     }
 
     @Test

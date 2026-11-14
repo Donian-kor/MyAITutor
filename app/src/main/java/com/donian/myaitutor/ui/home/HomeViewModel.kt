@@ -97,6 +97,7 @@ class HomeViewModel(
             selectedModelSnapshot = selectionRepository.getSelectedModel().let { model ->
                 if (model == AppModel.QWEN3) qwenModelManager.snapshot() else modelManager.snapshot()
             },
+            qwenSnapshot = qwenModelManager.snapshot(),
             chatMode = selectionRepository.isFreeChatEnabled()
         )
     )
@@ -479,7 +480,7 @@ class HomeViewModel(
     /** 선택 모델의 다운로드를 시작합니다. 선택 모델이 Qwen이면 Qwen 관리자를 사용합니다. */
     fun startSelectedModelDownload() {
         val target = _state.value.selectedModel
-        val manager = if (target == AppModel.QWEN3) qwenModelManager else modelManager
+        val manager = managerFor(target)
         runCatching { manager.startDownload() }
             .onSuccess {
                 setStatusMessage(stringProvider.get(R.string.status_download_started))
@@ -503,15 +504,14 @@ class HomeViewModel(
     }
 
     private fun refreshModelSnapshot() {
-        val selected = _state.value.selectedModel
-        val snapshot = if (selected == AppModel.QWEN3) {
-            qwenModelManager.snapshot()
-        } else {
-            modelManager.snapshot()
-        }
+        val gemmaSnapshot = modelManager.snapshot()
+        val qwenSnapshot = qwenModelManager.snapshot()
+        val selectedSnapshot =
+            if (_state.value.selectedModel == AppModel.QWEN3) qwenSnapshot else gemmaSnapshot
         _state.value = _state.value.copy(
-            modelSnapshot = snapshot,
-            selectedModelSnapshot = snapshot
+            modelSnapshot = gemmaSnapshot,
+            qwenSnapshot = qwenSnapshot,
+            selectedModelSnapshot = selectedSnapshot
         )
     }
 

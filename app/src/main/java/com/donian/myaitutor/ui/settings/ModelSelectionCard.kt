@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.donian.myaitutor.R
@@ -84,11 +85,26 @@ fun ModelSelectionCard(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                stringResource(R.string.model_selection_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    stringResource(R.string.model_selection_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    stringResource(R.string.model_download_wifi_notice),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
 
             Column(
                 modifier = Modifier.selectableGroup(),
@@ -268,7 +284,11 @@ private fun IntegratedModelRow(
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        "$sizeLabel · ${statusLabel(snapshot.status)}",
+                        if (isBusy) {
+                            statusLabel(snapshot.status)
+                        } else {
+                            "$sizeLabel · ${statusLabel(snapshot.status)}"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = if (isReady) colors.tertiary else colors.onSurfaceVariant,
                         fontWeight = if (isReady) FontWeight.Bold else FontWeight.Normal

@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.History
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
-import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -212,11 +211,6 @@ internal fun SettingsScreen(
                         icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = colors.primary, modifier = Modifier.size(22.dp)) },
                         title = stringResource(R.string.settings_ocr_title),
                         body = stringResource(R.string.settings_ocr_details)
-                    )
-                    InfoCard(
-                        icon = { Icon(Icons.Default.Wifi, contentDescription = null, tint = colors.primary, modifier = Modifier.size(22.dp)) },
-                        title = stringResource(R.string.info_download_title),
-                        body = stringResource(R.string.info_download_body)
                     )
                     InfoCard(
                         icon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = colors.primary, modifier = Modifier.size(22.dp)) },
