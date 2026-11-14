@@ -89,8 +89,8 @@
 | [완료] | 모델 복구 다이얼로그 노출 규칙 테스트 | 11.3 | `isNoModelRecoveryRequired` 3개 테스트 |
 | [완료] | THIRD_PARTY_NOTICES 구성요소별 표 재정리 | — | Qwen·LiteRT-LM 추가 |
 | [완료] | MyAITutor 통합 기술 문서 추가 | — | 4개 문서 통합 정리 |
-| [미진행] | HomeViewModel 단일 파일 분리 (1,212줄) | 13.2-7 | 대규모 리팩터링, 별도 승인 필요 |
-| [보류] | Gemma 해시 검증 I/O 오류 처리 (현재 상태 유지) | 13.4 | 사용자 결정: 완화(완전 보존), 별도 승인 시 재검토 |
+| [완료] | HomeViewModel 단일 파일 분리 (1,212줄 → 435줄) | 13.2-7 | 헬퍼 5개 + 컨트롤러 4개로 분리, 테스트 169/169 |
+| [완료] | Gemma 해시 검증 I/O 오류 처리 | 13.4 | Qwen 패리티(판정 객체·파일 지문·정확 일치) + I/O 백오프 |
 | [미진행] | 실기기 테스트 전 항목 (11.4) | 11.4 | 모든 수정 완료 후 마지막 단계 |
 | [보류] | 다크 테마 도입 (도입 계획 없음) | 13.3 | 사용자 결정: 도입 계획 없음, 별도 승인 시 재검토 |
 | [미진행] | Qwen 2,048 예산 추정치 실제 토크나이저 검증 | 10.3 | 단위 테스트와 함께 실제 기기 검증 필요 |
@@ -148,7 +148,8 @@
 | `camera` | `ImageNormalizer.kt` | 62 | OCR 입력 정규화 (장변 2400px, JPEG 92%) |
 | `camera` | `ImageSelection.kt` | 40 | 선택 영역 데이터 클래스 |
 | `model` | `EngineRuntime.kt` | 42 | 런타임 계약 인터페이스 + `ModelTransitionException` |
-| `model` | `ModelDownloadManager.kt` | 282 | Gemma 다운로드 관리자 |
+| `model` | `GemmaModelVerification.kt` | 145 | Gemma READY 판정 순수 로직 + I/O 백오프 정책 |
+| `model` | `ModelDownloadManager.kt` | 429 | Gemma 다운로드 관리자 |
 | `model` | `ModelDownloadRepository.kt` | 18 | 다운로드 저장소 인터페이스 |
 | `model` | `ModelRuntimeCoordinator.kt` | 186 | 전환 직렬화·해제·2단계 복구 |
 | `model` | `ModelSelectionRepository.kt` | 101 | `AppModel`·`ModelSelection`·선택 저장소 |
@@ -173,14 +174,23 @@
 | `ui/home` | `ChatMessage.kt` | 20 | 채팅 메시지 데이터 |
 | `ui/home` | `ComposerBar.kt` | 164 | 하단 입력 바 |
 | `ui/home` | `FollowUpChips.kt` | 100 | 후속 질문 칩 |
+| `ui/home` | `GenerationController.kt` | 494 | 추론 생성·취소·복구, 세대 관리, 스트림 파서 |
 | `ui/home` | `HomeContent.kt` | 24 | 과목 목록·후속 선택지 상수 |
-| `ui/home` | `HomeScreen.kt` | 472 | 메인 화면 |
-| `ui/home` | `HomeUiState.kt` | 108 | 홈 UI 상태 |
-| `ui/home` | `HomeViewModel.kt` | 1188 | 홈 비즈니스 로직 |
+| `ui/home` | `HomeScreen.kt` | 489 | 메인 화면 |
+| `ui/home` | `HomeUiState.kt` | 117 | 홈 UI 상태 |
+| `ui/home` | `HomeViewModel.kt` | 435 | 홈 상태 소유·폴링·컨트롤러 배선 |
 | `ui/home` | `HomeViewModelHost.kt` | 44 | ViewModel 호스트, 코디네이터 배선 |
+| `ui/home` | `ImageFileCleanup.kt` | 16 | 분석 임시 이미지 정리 |
+| `ui/home` | `ModelBlockedReasons.kt` | 30 | 자유 대화/모델 선택 차단 사유 |
+| `ui/home` | `ModelFileController.kt` | 116 | 모델 다운로드·삭제·스냅샷 갱신 |
+| `ui/home` | `ModelTransitionController.kt` | 251 | Gemma ↔ Qwen 전환·복구 |
 | `ui/home` | `NoModelRecoveryDialog.kt` | 64 | NO_MODEL_LOADED 복구 다이얼로그 |
+| `ui/home` | `OcrPromptFormatter.kt` | 36 | OCR 블록 → 프롬프트 텍스트 |
+| `ui/home` | `ShutdownDispatchers.kt` | 14 | 종료 해제 전용 daemon 디스패처 |
 | `ui/home` | `StatusBanner.kt` | 51 | 상태 배너 |
-| `ui/home` | `StringProvider.kt` | 10 | 문자열 조회 인터페이스 |
+| `ui/home` | `StringProvider.kt` | 9 | 문자열 조회 인터페이스 |
+| `ui/home` | `TransitionFailureMessage.kt` | 26 | 전환 실패 문구 선택(CPU 폴백 안내) |
+| `ui/home` | `WarmupController.kt` | 102 | 엔진 워밍업·캐시 정리 |
 | `ui/loading` | `ModelLoadingPhase.kt` | 58 | 로딩 단계 enum·판정 함수 |
 | `ui/loading` | `ModelLoadingScreen.kt` | 492 | 시작 로딩 화면 |
 | `ui/settings` | `AppSettingsRepository.kt` | 34 | 설정 저장소 (Thinking 모드) |
@@ -192,16 +202,18 @@
 | `ui/text` | `FormulaText.kt` | 70 | 인라인 LaTeX |
 | `ui/theme` | `Theme.kt` | 164 | Material3 테마 |
 
-### 2.2 앱 테스트 소스 (13개 파일, 149개 테스트)
+### 2.2 앱 테스트 소스 (15개 파일, 200개 테스트)
 
 | 파일 | 테스트 수 | 대상 |
 |---|---|---|
-| `ui/home/HomeViewModelTest.kt` | 44 | HomeViewModel |
-| `model/QwenModelVerificationTest.kt` | 18 | `QwenModelVerification.decide`, 상수 |
+| `ui/home/HomeViewModelTest.kt` | 48 | HomeViewModel |
+| `model/GemmaModelVerificationTest.kt` | 31 | Gemma READY 판정·I/O 백오프 정책 |
+| `model/QwenModelVerificationTest.kt` | 24 | `QwenModelVerification.decide`, 상수 |
 | `tutor/SwitchableTutorEngineTest.kt` | 13 | SwitchableTutorEngine 위임 규칙 |
 | `tutor/TutorStreamParserTest.kt` | 13 | 스트림 파서 |
 | `model/ModelRuntimeStateTest.kt` | 11 | `RuntimeStatus` 불변식 |
 | `model/ModelSelectionRepositoryTest.kt` | 10 | 선택 저장소·정규화 |
+| `model/QwenContextBudgetTest.kt` | 10 | Qwen 2,048 컨텍스트 예산 |
 | `ui/loading/ModelLoadingPhaseTest.kt` | 10 | `resolveModelLoadingPhase` |
 | `ui/text/AnswerSegmentsTest.kt` | 9 | 수식 분리·SUGGESTIONS 파싱 |
 | `ocr/OcrTextPostProcessorTest.kt` | 7 | OCR 후처리 |
@@ -211,7 +223,7 @@
 | `ai/Qwen3ChatTemplateTest.kt` | 2 | Chat Template 렌더링 |
 
 > [!IMPORTANT]
-> 149개는 소스의 `@Test` 정적 계수다. **통과 여부는 이 문서에서 검증하지 않았다.** (14장 참조)
+> 200개는 소스의 `@Test` 정적 계수이며, `:app:testDebugUnitTest` 실행 결과 **200/200 통과**를 확인했다. (14장 참조)
 
 ### 2.3 ppocr-sdk 소스 (26개 프로덕션 + 2개 계측 테스트)
 
@@ -335,6 +347,10 @@ ModelRuntimeCoordinator.switchTo()  [mutex 직렬화]
 > 2. `PromptTemplates.MAX_CONVERSATION_TOKENS` 계산식화 (4,096 − 1,024 = 3,072)
 > 3. `TutorGrade.usesThinking` 제거 (학년 연동 → 사용자 설정)
 > 4. `inferenceOptionsFor(isFollowUp, thinkingEnabled)` 시그니처 변경
+>
+> **예외 (2026-11-15 승인):** 13.4의 Gemma 해시 검증 정비. 파일 경로·URL·revision·SHA-256·
+> `MIN_MODEL_BYTES`·기존 SharedPreferences 키 4개는 그대로 두고, 순수 판정 객체(`GemmaModelVerification`)
+> 분리와 I/O 백오프용 신규 키 3개만 추가했다.
 
 ### 4.2 공통 수명주기 규정
 
@@ -391,7 +407,7 @@ ModelRuntimeCoordinator.switchTo()  [mutex 직렬화]
 | 파일명 | `gemma-4-E4B-it.litertlm` | `qwen3_4b_instruct_2507_mixed_int4.litertlm` |
 | Revision | `f254b5ba6e36f7d89cc7892e268e9877bc20f0a0` | `6ee6014fa9193ea4dbb309f3305d6ee0d78db5a0` |
 | 정확한 크기 | 3,659,530,240 bytes (약 3.66GB) | 2,659,057,664 bytes (약 2.66GB) |
-| 최소 허용 크기 | `MIN_MODEL_BYTES` = 3,500,000,000 | 정확한 크기 일치 필수 |
+| 최소 허용 크기 | 정확한 크기 일치 필수 (엔진 초기화만 `MIN_MODEL_BYTES` = 3,500,000,000) | 정확한 크기 일치 필수 |
 | SHA-256 | `0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0` | `9e48b165836256f5344d9d044930607b9c47f6ef34e27f82e96881664f3ba2fd` |
 | 컨텍스트 | 32k 기본 (앱에서 4,096으로 제한) | 2,048 |
 | 라이선스 | Apache-2.0 | Apache-2.0 |
@@ -407,13 +423,14 @@ ModelRuntimeCoordinator.switchTo()  [mutex 직렬화]
 - 상태 7종: `NOT_INSTALLED`, `QUEUED`, `DOWNLOADING`, `PAUSED`, `VERIFYING`, `READY`, `FAILED`
 - 모델 삭제 시 다운로드 ID와 검증 캐시도 정리
 
-### 5.3 READY 판정 조건 (Qwen)
+### 5.3 READY 판정 조건 (Qwen / Gemma)
 
-`QwenModelVerification.decide()`가 순수 로직으로 판정하고 `QwenModelDownloadManager`가 상태로 매핑한다. READY가 되려면 **모든** 조건을 만족해야 한다.
+두 모델 모두 `decide()`가 순수 로직으로 판정하고 각 다운로드 관리자가 상태로 매핑한다.
+**Gemma는 2026-11-15에 Qwen과 동일한 구조로 정비했다** (13.4 참조). READY가 되려면 **모든** 조건을 만족해야 한다.
 
 1. 이전 다운로드가 완료로 기록되어 있다 (`KEY_COMPLETED`)
 2. 파일이 존재한다
-3. 파일 길이가 `2,659,057,664` bytes와 **정확히** 일치한다
+3. 파일 길이가 승인값과 **정확히** 일치한다 (Gemma 3,659,530,240 / Qwen 2,659,057,664)
 4. `KEY_HASH_MISMATCH`가 기록되어 있지 않다
 5. `KEY_HASH_VERIFIED`가 true이다 (또는 SHA 검증이 불필요한 경우)
 
@@ -426,9 +443,12 @@ ModelRuntimeCoordinator.switchTo()  [mutex 직렬화]
 
 해시 계산은 `Dispatchers.IO`에서 1MB 버퍼로 스트리밍한다.
 
-> [!WARNING]
-> 검증 캐시는 `KEY_HASH_VERIFIED` / `KEY_HASH_MISMATCH` **불리언만** 저장한다.
-> revision·파일 크기·파일 fingerprint(수정시각 등)와 묶지 않아, 다른 파일이 같은 경로에 놓이면 이전 검증 결과가 재사용될 수 있다. Gemma 쪽도 동일한 구조다.
+> [!NOTE]
+> 검증 캐시는 두 모델 모두 `KEY_HASH_LENGTH`·`KEY_HASH_LAST_MODIFIED` 파일 지문과 묶여 있다.
+> 같은 경로에 다른 파일이 놓이면 이전 검증 결과를 재사용하지 않고 다시 검증한다.
+>
+> Gemma는 여기에 더해 I/O 오류 이력(`KEY_HASH_IO_ERROR`·`KEY_HASH_IO_ATTEMPTS`·`KEY_HASH_RETRY_AFTER`)을
+> 별도로 기록해, 디스크 오류 시 5초 → 30초 → 5분 백오프로 재시도한다.
 
 ### 5.4 모델 카드 실측 필요 항목 (Qwen)
 
@@ -731,7 +751,6 @@ data class OcrBlock(
 | OCR 입력 블록 축약 | 미구현. 출력 예산 ≤ 0 시 블록 경계 축약 없음 | 긴 OCR 입력에서 2,048 초과 가능 |
 | `error_context_overflow` 문자열 | 정의만, 참조 0건 | 위 미구현의 부수 증거 |
 | `error_cpu_fallback_blocked` 문자열 | 정의만, 참조 0건 | CPU 차단이 `IllegalStateException` 메시지로만 전파되고 UI 안내로 연결되지 않는다 |
-| 검증 캐시 fingerprint | 불리언만 저장 (5.3 참조) | 파일 교체 시 이전 검증 결과 재사용 가능 |
 | 컨텍스트 토큰 표시 | `HomeUiState.maxContextTokens = MAX_CONTEXT_TOKENS`(4,096)이 모델 분기 없이 표시 | Qwen 활성 시 화면 수치가 실제 한도의 2배 |
 | Thinking 카드 | `SettingsScreen`에서 선택 모델과 무관하게 항상 표시. 제목 "Gemma 4 생각 모드" | 동작 오류는 없으나(QwenAssistant가 false 강제) Qwen에서도 반영되는 것처럼 보임 |
 | Qwen 다운로드 중 메모리 확인 | `startDownload()`이 저장 공간만 확인, `availMem` 미확인 | 3GB 미만일 때 다운로드 일시 중단 규칙 미구현 |
@@ -745,7 +764,11 @@ data class OcrBlock(
 
 ### 11.1 단위 테스트 현황
 
-총 **149개** (13개 파일). 상세는 2.2 참조.
+총 **200개** (15개 파일). 상세는 2.2 참조.
+
+> [!NOTE]
+> 2026-11-15 `:app:testDebugUnitTest` 실행 결과 **200/200 통과**를 확인했다.
+> (HomeViewModel 분리 169개 + Gemma 해시 검증 정비 31개)
 
 **잘 커버된 영역:** UI 상태 로직, 스트림 파서, 모델 검증 판정, 선택 저장소 정규화, 런타임 불변식, OCR 후처리, 마크다운/수식 분리.
 
@@ -950,15 +973,34 @@ OCR 문제 전문이 DEBUG 빌드에서만 Logcat에 기록되도록 `BuildConfi
 
 `generationJob`, `generationId`, `userCancelledGeneration`, `queuedQuestion`, `warmupJob`, `isClosed`가 함께 사용된다.
 
-**영향:** 상태 간 상호작용이 복잡하며, 경쟁 조건 가능성을 정적으로 배제하기 어렵다. `HomeViewModelTest` 44개가 이 영역을 비교적 두텁게 커버한다.
+**영향:** 상태 간 상호작용이 복잡하며, 경쟁 조건 가능성을 정적으로 배제하기 어렵다. `HomeViewModelTest` 48개가 이 영역을 비교적 두텁게 커버한다.
 
 **개선 방향:** 즉시 조치는 불필요. 신규 기능 추가 시 상태 머신 도입을 검토한다.
 
-#### 7. `HomeViewModel` 단일 파일 비대 (1,188줄)
+#### 7. `HomeViewModel` 단일 파일 비대 (1,188줄) — **[완료]**
 
-상태·OCR·LLM·다운로드·전환·복구·캐시 정리가 한 파일에 집중되어 있다. `HomeViewModelHost`가 런타임 코디네이터를 주입해 일부 관심사는 분리되었으나 ViewModel 자체는 미분리.
+상태·OCR·LLM·다운로드·전환·복구·캐시 정리가 한 파일에 집중되어 있었다. `HomeViewModelHost`가 런타임 코디네이터를 주입해 일부 관심사는 분리되었으나 ViewModel 자체는 미분리.
 
-**개선 방향:** 사용자 요청 시 별도 작업으로 진행. 분리 시 `HomeViewModelTest` 44개가 회귀 기준선이 된다.
+**완료 내용 (2026-11-15):** 공개 API·동작 변화를 0으로 유지한 채 관심사별로 분리했다.
+
+| 구분 | 파일 | 역할 |
+|---|---|---|
+| 헬퍼 | `OcrPromptFormatter.kt` | OCR 블록 → 프롬프트 텍스트 |
+| 헬퍼 | `TransitionFailureMessage.kt` | 전환 실패 문구 선택(CPU 폴백 안내) |
+| 헬퍼 | `ModelBlockedReasons.kt` | 자유 대화/모델 선택 차단 사유 |
+| 헬퍼 | `ShutdownDispatchers.kt` | 종료 해제 전용 daemon 디스패처 |
+| 헬퍼 | `ImageFileCleanup.kt` | 분석 임시 이미지 정리 |
+| 컨트롤러 | `GenerationController.kt` | 추론 생성·취소·복구, 세대 관리, 스트림 파서 |
+| 컨트롤러 | `ModelTransitionController.kt` | Gemma ↔ Qwen 전환·복구 |
+| 컨트롤러 | `ModelFileController.kt` | 모델 다운로드·삭제·스냅샷 갱신 |
+| 컨트롤러 | `WarmupController.kt` | 엔진 워밍업·캐시 정리 |
+
+`HomeViewModel`은 상태 소유·폴링·`close()`·카메라 이미지 생명주기·컨트롤러 배선만 남았다. **1,212줄 → 435줄(-64%)**.
+컨트롤러는 ViewModel을 참조하지 않고 `MutableStateFlow<HomeUiState>`·`CoroutineScope`·디펜던시를 생성자로 주입받는다.
+
+**검증:** `HomeViewModelTest` 48/48, 전체 단위 테스트 169/169 통과, `assembleDebug`·`lintDebug` 통과.
+
+**개선 방향:** 완료. 신규 기능 추가 시 컨트롤러 경계를 따른다.
 
 #### 8. `GemmaAssistant` legacy 콜백 API의 학년 하드코딩 — **[완료]**
 
@@ -993,51 +1035,58 @@ override suspend fun askFollowUp(...) = collectLegacy(
 | `OcrImageEnhancer.sharpen()` 메모리 | `MAX_SHARPEN_PIXELS = 5_000_000` 가드 하에서 `IntArray` 2개 = 약 40MB | 가드가 있으므로 OOM 근거는 불충분. 타일 처리 검토 여지 |
 | `HomeUiState.maxContextTokens` 모델 미분기 | Qwen에서 4,096으로 표시 (10.3 참조) | 코드 수정 필요 |
 
-### 13.4 Gemma 해시 검증의 I/O 오류 처리 (결정됨: 완화 적용)
+### 13.4 Gemma 해시 검증의 I/O 오류 처리 — **[완료]**
 
 > [!IMPORTANT]
-> **사용자 결정:** I/O 오류 처리 개선을 **완화(완전 보존)** 방향으로 진행한다.
-> `ModelDownloadManager.kt`는 계획서 0.1의 Gemma 보존 대상이다. 현재 동작(실기기 검증 완료)을 유지하고,
-> 아래 미비를 해결하지 않는 것으로 결정했다. 별도 승인 시 재검토.
->
-> 검토 보류된 개선 방향:
-> - `catch`에서 I/O 오류를 별도 키로 기록해 `snapshot()`이 재시도 가능/불가능을 구분
-> - 검증 재시도에 백오프(예: 5초 → 30초 → 5분) 적용
-> - Gemma 크기 판정을 Qwen과 동일한 정확 일치로 통일
+> **사용자 결정:** Qwen과 동일한 구조적 패리티를 적용하고, I/O 오류 처리를 함께 개선한다.
+> Gemma 보존 원칙에 따라 파일 경로·URL·revision·SHA-256·`MIN_MODEL_BYTES`·기존 SharedPreferences 키 4개는 변경하지 않았다.
+> 추가된 것은 새 키 3개와 순수 판정 객체뿐이다.
 
-**현재 동작** ([verifyModelHash()](file:///C:/Users/donian/Desktop/android_app/MyAITutor/app/src/main/java/com/donian/myaitutor/model/ModelDownloadManager.kt#L194))
+**완료 내용 (2026-11-15)**
 
-```kotlin
-val match = actual.equals(EXPECTED_MODEL_SHA256, ignoreCase = true)
-preferences.edit {                                    // 성공 경로에서만 실행
-    putBoolean(KEY_HASH_VERIFIED, match)
-    putBoolean(KEY_HASH_MISMATCH, !match)
-}
-match
-} catch (e: Exception) {
-    false                                               // prefs 미갱신
-}
+| 구분 | 변경 전 | 변경 후 |
+|---|---|---|
+| 판정 로직 | `snapshot()` 내 인라인 `if` | [GemmaModelVerification](file:///C:/Users/donian/Desktop/android_app/MyAITutor/app/src/main/java/com/donian/myaitutor/model/GemmaModelVerification.kt) 순수 객체 (JVM 테스트 가능) |
+| 판정 단위 | 없음 | `Verdict` enum 4종 (`READY`/`NEEDS_HASH_VERIFICATION`/`MISMATCH`/`NOT_INSTALLED`) |
+| 크기 판정 | `>= MIN_MODEL_BYTES` (3.5GB) | `!= EXPECTED_MODEL_BYTES` 정확 일치 |
+| 해시 캐시 바인딩 | 없음 | `KEY_HASH_LENGTH`·`KEY_HASH_LAST_MODIFIED` |
+| I/O 오류 기록 | `catch { false }` (미기록) | `KEY_HASH_IO_ERROR`·`KEY_HASH_IO_ATTEMPTS`·`KEY_HASH_RETRY_AFTER` |
+| 재시도 주기 | 폴링마다 3.66GB 재해싱 | 5초 → 30초 → 5분(상한) |
+| 안내 문구 | `VERIFYING`만 표시 | 재시도 중 / 5회 이상 실패 시 재다운로드 안내로 분기 |
+
+**동작 흐름**
+
+```
+검증 실패(IO) → 실패 횟수 기록 + 다음 재시도시각 = now + backoff
+             ↓
+needsHashVerification() → 백오프 중이면 false
+             ↓
+폴링이 verifyModelHash()를 호출하지 않음 → 디스크 재읽기 중단
+             ↓
+백오프 만료 → 1회 재시도 (성공 시 I/O 이력 초기화)
 ```
 
-| 관찰 | 판정 |
+**안내 문구 2단계**
+
+| 조건 | 문구 |
 |---|---|
-| `catch`가 prefs를 갱신하지 않는다 | 사실. 다만 재시도를 유도하는 의도로 볼 수 있다 |
-| I/O 오류가 `KEY_HASH_MISMATCH`와 구분되지 않는다 | 사실. 전자는 영구 실패(재다운로드 필요), 후자는 일시적일 수 있다 |
-| 폴링마다 전체 파일을 재해싱한다 | 사실. `HomeViewModel` 폴링(L134)이 5초 간격으로 `needsHashVerification()` → `verifyModelHash()`를 호출 |
-| 영구 VERIFYING 루프 | **아님.** 재시도로 복구된다. 앱 재시작·파일 정상화 시 해소 |
-| 무한 로딩으로 화면 갇힘 | **아님.** `ModelLoadingScreen`이 `VERIFYING`에서도 건너뛰기(`onSkip`)를 제공한다 |
+| 백오프 중 (1~4회 실패) | `dl_msg_hash_verify_retrying` — "모델 검증을 일시 중단했습니다. 잠시 후 다시 시도합니다." |
+| 5회 이상 실패 | `dl_msg_hash_verify_failed` — "모델 검증을 완료할 수 없습니다. 모델을 다시 다운로드해 주세요." |
 
-**실질 영향**
+**설계 노트**
 
-1. **사용자 피드백 부재** — 검증이 실패해도 `FAILED`로 전이하지 않아 사유를 볼 수 없다.
-2. **불필요한 I/O** — 실패 상태에서 5초마다 2.6~3.6GB를 다시 읽는다. 백오프가 없다.
-3. **정책 불일치** — Gemma는 크기를 `>= 3_500_000_000` 임계값으로 비교하고, Qwen은 `!= EXPECTED_MODEL_BYTES` 정확 일치로 비교한다(5.3 참조). SHA-256이 최종 방어선이므로 실질 위험은 낮다.
+- I/O 오류는 `VERIFYING`을 유지한다. `FAILED`로 보내지 않는 이유는 일시적 오류일 수 있어 재다운로드를
+  요구하는 것은 과하기 때문이다. `ModelLoadingScreen`의 건너뛰기(`onSkip`)도 계속 동작해 화면이 갇히지 않는다.
+- `catch`에서 `KEY_HASH_MISMATCH`를 재사용하지 않는다. 불일치는 영구 실패(재다운로드), I/O 오류는 일시적이므로
+  섞으면 3.66GB를 불필요하게 다시 받게 된다.
+- 엔진 초기화 경로([GemmaAssistant.kt#L254](file:///C:/Users/donian/Desktop/android_app/MyAITutor/app/src/main/java/com/donian/myaitutor/ai/GemmaAssistant.kt#L254))는
+  `MIN_MODEL_BYTES`를 그대로 사용한다. READY는 SHA까지 통과한 상태이므로 항상 이 값을 넘는다.
 
-**검토 가능한 개선 방향** (착수 시 별도 승인 필요 — Gemma 보존 원칙과 충돌 검토 선행)
+**검증:** `GemmaModelVerificationTest` 31/31, 전체 단위 테스트 200/200 통과, `assembleDebug`·`lintDebug` 통과.
 
-- `catch`에서 I/O 오류를 별도 키로 기록해 `snapshot()`이 재시도 가능/불가능을 구분
-- 검증 재시도에 백오프(예: 5초 → 30초 → 5분) 적용
-- Gemma 크기 판정을 Qwen과 동일한 정확 일치로 통일
+> [!WARNING]
+> **실기기 확인 필요.** 크기를 정확 일치로 바꿨으므로, 실제 배포 파일이 정확히 3,659,530,240 바이트인지
+> 확인해야 한다(11.4 항목). 다르다면 `EXPECTED_MODEL_BYTES`를 승인값으로 갱신해야 한다.
 
 ---
 
@@ -1093,13 +1142,13 @@ Android Studio 인덱스 기반 도구로 HEAD `5bd9189` 코드를 직접 읽어
 - 0.6 정규화 3경로
 - Qwen 전용 상수 3종, `ThinkingConfig(false)`, CPU 폴백 5GB 임계값
 - 신규 파일 13개의 존재와 배선
-- 단위 테스트 149개 (13파일, `@Test` 정적 계수)
+- 단위 테스트 200개 (15파일, `@Test` 정적 계수)
 - 미완성 항목의 실제 미구현 여부 (`PEAK_RSS_LIMIT_BYTES`, `error_context_overflow`, `error_cpu_fallback_blocked` 참조 0건 확인)
 - 이 문서에 인용된 모든 코드 스니펫의 실제 존재
 
 ### 15.2 검증하지 못한 것
 
-- **빌드와 테스트를 실행하지 않았다.** 149개는 `@Test` 개수이며 통과 여부는 미확인이다.
+- **빌드와 테스트는 미실행.** 200개는 `@Test` 개수이며 통과 여부는 미확인이다. (단, 2026-11-15 HomeViewModel 분리 및 Gemma 해시 검증 정비 시 200/200 통과를 별도로 확인했다.)
 - 모델 카드의 파일 크기·SHA-256이 실제 다운로드 파일과 일치하는지
 - 2,048 토큰 한도와 학습 모드 지시문의 실제 토큰 점유율
 - GPU/CPU 백엔드별 실제 피크 메모리 (기기 편차 큼)
