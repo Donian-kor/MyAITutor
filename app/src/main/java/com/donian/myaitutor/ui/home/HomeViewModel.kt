@@ -2,6 +2,7 @@ package com.donian.myaitutor.ui.home
 
 import android.content.Context
 import android.util.Log
+import com.donian.myaitutor.BuildConfig
 import com.donian.myaitutor.R
 import com.donian.myaitutor.ai.Assistant
 import com.donian.myaitutor.ai.GemmaAssistant
@@ -65,7 +66,13 @@ class HomeViewModel(
     private val enablePolling: Boolean = true,
     private val ocrTextRecognizer: OcrTextRecognizer =
         appContext.applicationContext as OcrTextRecognizer,
-    private val ocrLogger: (String) -> Unit = { Log.d(TAG, "OCR 결과:\n$it") },
+    /**
+     * OCR 원문 전달기. 문제 전문은 개인정보를 포함할 수 있으므로 DEBUG 빌드에서만 Logcat에 남긴다.
+     * 테스트에서는 이 인자로 출력 내용을 검증할 수 있습니다.
+     */
+    private val ocrLogger: (String) -> Unit = {
+        if (BuildConfig.DEBUG) Log.d(TAG, "OCR 결과:\n$it")
+    },
     private val stringProvider: StringProvider = StringProvider { resId, args ->
         appContext.getString(resId, *args)
     },
@@ -700,8 +707,8 @@ class HomeViewModel(
                 }
 
                 val ocrBlocks = ocrTextRecognizer.recognize(imageToAnalyze)
-                // TODO: OCR 결과 텍스트의 Logcat 출력을 디버깅 종료 후 제거하세요.
                 val ocrText = formatOcrBlocksForPrompt(ocrBlocks)
+                // ocrLogger 기본값은 DEBUG 빌드에서만 Logcat에 기록한다(개인정보 노출 방지).
                 ocrLogger(ocrText)
                 if (ocrText.isBlank()) {
                     if (currentGeneration == generationId) {
